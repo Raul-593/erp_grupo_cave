@@ -1,0 +1,28 @@
+{
+  "name": "@erp/db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capa de datos: conexión PostgreSQL y migraciones versionadas",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "db:check": "node --env-file=../../.env scripts/check-connection.ts",
+    "db:migrate": "node --env-file=../../.env scripts/migrate.ts --target=dev",
+    "db:migrate:test": "node --env-file=../../.env scripts/migrate.ts --target=test",
+    "db:status": "node --env-file=../../.env scripts/migrate.ts --status",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "node-pg-migrate": "^9.0.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.4",
+    "@types/pg": "^8.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.2"
+  }
+}

@@ -1,0 +1,36 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Variables de entorno y secretos (solo se versiona .env.example)
+.env
+.env.*
+!.env.example
+
+# Almacenamiento local privado de archivos (PDF de TDR, evidencias)
+storage/
+
+# Volcados y respaldos de base de datos
+*.dump
+*.backup
+*.sql.gz
+dumps/
+
+# Compilación y caché
+dist/
+build/
+.next/
+coverage/
+*.tsbuildinfo
+
+# Registros
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/

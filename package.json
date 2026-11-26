@@ -1,0 +1,18 @@
+{
+  "name": "erp-v1",
+  "private": true,
+  "description": "Grupo Cave V1 — sistema de gestión de eventos",
+  "type": "module",
+  "packageManager": "pnpm@12.21.0",
+  "engines": {
+    "node": ">=24.11"
+  },
+  "scripts": {
+    "db:check": "pnpm --filter @erp/db run db:check",
+    "db:migrate": "pnpm --filter @erp/db run db:migrate",
+    "db:migrate:test": "pnpm --filter @erp/db run db:migrate:test",
+    "db:status": "pnpm --filter @erp/db run db:status",
+    "test:db": "pnpm --filter @erp/db run test",
+    "typecheck": "pnpm -r run typecheck"
+  }
+}
