@@ -25,7 +25,7 @@ La empresa todavía no se gestiona en la interfaz: el esquema queda preparado pa
 
 ## 2. Alcance de la primera entrega (Fase 1)
 
-La Fase 1 se implementa como el módulo **Operación › Requerimiento** del prototipo visual (§6, «Guía visual»). Los demás módulos del prototipo no se implementan en esta fase.
+La Fase 1 se implementa como el módulo **Operación › Requerimiento** del prototipo visual (§6, «Guía visual»). Los demás módulos del prototipo no se implementan en esta fase, salvo la **vista previa con datos de demostración** descrita al final de esta sección.
 
 El flujo principal debe permitir:
 
@@ -44,14 +44,24 @@ La extracción no debe generar precios ni presupuestos en esta fase. El monto de
 
 - Estimación de precios unitarios mediante IA, presupuestos y ofertas económicas.
 - Tareas, fechas y seguimiento de responsables (más allá de un responsable por ítem), permisos multiusuario e informes con revisión y aprobación.
-- Los demás módulos del prototipo: planificación, abastecimiento, ejecución, cierre, finanzas, administración, portal del proveedor, comercial, marketing y talento; también las solicitudes de cotización, el comparativo de proveedores y las versiones o adendas del requerimiento.
+- Los demás módulos del prototipo: cierre, finanzas, administración, portal del proveedor, comercial, marketing y talento; las versiones o adendas del requerimiento; y la **edición** de planificación, abastecimiento, ejecución y cotizaciones (su consulta en modo lectura sí está permitida: ver «Vista previa con datos de demostración»).
 - Operación sin conexión y sincronización de evidencias.
 - Gestión de proveedores, inventario, compras, facturación y contabilidad.
-- Carga de fotografías de eventos y generación de reportes fotográficos.
+- Generación de reportes fotográficos, y revisión o publicación de evidencias al cliente. La carga de fotografías por ítem desde Ejecución sí está adelantada (ver «Vista previa con datos de demostración»).
 - Integraciones adicionales con IA, RAG, bases vectoriales o agentes autónomos.
 - Despliegue en producción y migración efectiva a Supabase hasta su aprobación.
 
-No implementar estos módulos de manera anticipada. Diseñar únicamente las interfaces y separaciones que permitan incorporarlos posteriormente sin reescribir el núcleo del sistema. Inventario completo y contabilidad fiscal no forman parte de V1 salvo aprobación posterior; V1 sí incluye el control de costos, facturas y pagos a proveedores.
+No implementar estos módulos de manera anticipada, fuera de la excepción siguiente. Diseñar únicamente las interfaces y separaciones que permitan incorporarlos posteriormente sin reescribir el núcleo del sistema. Inventario completo y contabilidad fiscal no forman parte de V1 salvo aprobación posterior; V1 sí incluye el control de costos, facturas y pagos a proveedores.
+
+### Vista previa con datos de demostración (decisión del usuario, 2026-11-26)
+
+Mientras no haya clave de API, el usuario pidió seguir avanzando con los datos ilustrativos del prototipo. Excepción acotada al alcance anterior (detalle y etapas en `PLAN.md`):
+
+- Los datos que el prototipo muestra en Operación › Requerimiento, Planificación, Abastecimiento y Ejecución se cargan **solo en el proyecto 1 del entorno local**, mediante un script idempotente (no una migración). Entran como un documento de demostración con una extracción de proveedor `demo`, ya confirmada, y se rotulan «Datos de demostración» en pantalla. No son datos de un TDR real ni referencia de precios.
+- El archivo con esos datos (nombres de personas y montos) no se versiona; el script sí.
+- Planificación, Abastecimiento y Ejecución se muestran **en modo lectura**. Los indicadores se calculan siempre a partir de las filas guardadas; no se guardan totales literales del prototipo.
+- Desde Ejecución se pueden **subir, ver y eliminar fotografías por ítem** (adelanto parcial de la Fase 7). Las fotografías del prototipo no existen como archivos y no se fabrican.
+- El modelo de órdenes, pagos y costos es provisional y se rediseña en la Fase 6.
 
 ## 3. Decisiones técnicas
 
@@ -157,11 +167,11 @@ No acceder a ningún proveedor de IA directamente desde el navegador. No concent
 
 ### Guía visual (prototipo CAVE ERP)
 
-La interfaz reproduce el estilo del prototipo `CAVE-ERP-v3`. Se toma su diseño, no sus datos: los nombres, montos y proyectos del prototipo son ilustrativos y no se cargan como datos ni como semillas.
+La interfaz reproduce el estilo del prototipo `CAVE-ERP-v3`. Se toma su diseño, no sus datos: los nombres, montos y proyectos del prototipo son ilustrativos y no se cargan como datos ni como semillas, con la única excepción de la demostración del proyecto 1 (§2, «Vista previa con datos de demostración»).
 
 - **Estructura:** barra lateral oscura fija (logo «CAVE ERP», grupos de navegación en mayúsculas, ítem activo con borde azul a la izquierda); barra superior blanca con selector de proyecto; subnavegación por pestañas en mayúsculas; contenido con ancho máximo de 1420 px. En pantallas de menos de 880 px la barra lateral se oculta tras un botón de menú.
-- **Navegación en Fase 1:** solo se muestra lo implementado: Operación › Proyectos (alta y selección mínima), Operación › Requerimiento y el catálogo mínimo de trabajadores que alimenta la lista de responsables. Los módulos restantes del prototipo (Planificación, Abastecimiento, Ejecución, Cierre, Finanzas, Administración, Portal proveedor, Comercial, Marketing, Talento, Mi día) no aparecen hasta su fase. El selector «Empresa» se incorpora cuando se implemente `companies`.
-- **Pantalla Requerimiento:** encabezado con título en mayúsculas, subtítulo y acciones («+ Ítem», «Cargar TDR» como botón principal); tarjeta «Ficha del proyecto» en cuadrícula de etiqueta/valor; tarjeta «Matriz de entregables» con las columnas Ítem, Producto (con el rubro debajo en texto secundario), Subproducto, Descripción, Cant., Unidad, Días, Observaciones y **Responsable** (lista desplegable). Pie con el total de ítems y rubros. Las tarjetas de cotizaciones, comparativo y versiones/adendas del prototipo quedan para fases posteriores.
+- **Navegación en Fase 1:** solo se muestra lo implementado: Operación › Proyectos (alta y selección mínima), Operación › Requerimiento, el catálogo mínimo de trabajadores que alimenta la lista de responsables y, en modo lectura, Planificación, Abastecimiento y Ejecución (§2). Los módulos restantes del prototipo (Cierre, Finanzas, Administración, Portal proveedor, Comercial, Marketing, Talento, Mi día) no aparecen hasta su fase. El selector «Empresa» se incorpora cuando se implemente `companies`.
+- **Pantalla Requerimiento:** encabezado con título en mayúsculas, subtítulo y acciones («+ Ítem», «Cargar TDR» como botón principal); tarjeta «Ficha del proyecto» en cuadrícula de etiqueta/valor; tarjeta «Matriz de entregables» con las columnas Ítem, Producto (con el rubro debajo en texto secundario), Subproducto, Descripción, Cant., Unidad, Días, Observaciones y **Responsable** (lista desplegable). Pie con el total de ítems y rubros. Las tarjetas de cotizaciones y comparativo se muestran en modo lectura (§2); las versiones/adendas quedan para fases posteriores.
 - **Tokens:** se conservan los colores del prototipo como variables CSS (modo claro y oscuro): navegación `#0E1D33`, fondo `#F5F7FA`, tarjeta `#FFFFFF`, texto `#0F1A2A`, líneas `#E4E9F0`, azul primario `#1F5FCC`, éxito `#0E7A52`, advertencia `#9A6400`, error `#B4302A` y violeta `#5B4BB7` para todo lo que proviene de la IA. Los estados se muestran como etiquetas («pill») de color.
 - **Tipografía:** Inter 400/500/600 con cifras tabulares; títulos y rótulos en mayúsculas con espaciado amplio; tamaño base 13,5 px.
 - **Contenido de IA:** todo valor propuesto por la IA se distingue visualmente (violeta, rótulo «Propuesta IA») hasta que el usuario lo confirma.
@@ -196,6 +206,8 @@ Migraciones `0001`–`0005` aplicadas (subfase 1.1) con `clients`, `events`, `td
 | `tdr_items` | Filas editables y confirmadas vinculadas a una extracción | Existente (añadir `rubro`) |
 | `workers` | Trabajadores que pueden ser responsables de un ítem (nombre, cargo, activo) | Propuesta (`0006`) |
 | `tdr_item_assignments` | Responsable único de cada ítem | Propuesta (`0006`) |
+
+Tablas de la migración `0007` (vista previa de §2; modelo financiero provisional hasta la Fase 6): `suppliers` (proveedores), `item_plans` (proveedor adjudicado, costo y contrato por ítem), `activities` y `activity_items` (cronograma), `purchase_orders`, `purchase_order_lines` y `payments`, `quote_requests` y `quote_lines`, `item_execution` (estado de montaje), `pre_event_checks` e `item_evidences` (fotografías; el archivo vive en el almacenamiento privado). Todas cuelgan de ítems de una matriz **confirmada** y del mismo proyecto.
 
 Relaciones: una empresa puede tener varios proyectos; un contratante puede tener varios proyectos; un proyecto puede tener varios TDR; cada TDR puede tener varios intentos de extracción; cada extracción puede tener múltiples ítems; cada ítem tiene como máximo un responsable.
 
@@ -385,7 +397,7 @@ Subfases ordenadas:
 5. **1.4 Tabla editable:** visualizar ítem (1.1, 1.2…), rubro, producto, subproducto, descripción, cant, unidad, días, observación y responsable; editar, agregar, eliminar y confirmar filas; asignar un responsable por ítem con una lista desplegable de trabajadores activos; editar y confirmar la ficha del proyecto. Conservar el JSON original y las ediciones humanas por separado. Guardar el resultado asociado al TDR y proyecto.
 6. **1.5 Validación:** probar distintos formatos y PDF extensos, casos de tablas entre páginas, cantidades inciertas, reprocesamiento, seguridad y precisión. Acordar criterios cuantitativos con la empresa antes del piloto.
 
-**Entrega:** en Operación › Requerimiento, cargar un PDF, pulsar un botón, generar la ficha y el desglose, revisarlos, asignar un responsable por ítem y persistirlos en PostgreSQL. No implementar precios, tareas ni seguimiento de responsables, informes, pagos, fotografías ni sincronización en esta fase. Un prototipo sin autenticación solo puede ejecutarse localmente y con datos autorizados.
+**Entrega:** en Operación › Requerimiento, cargar un PDF, pulsar un botón, generar la ficha y el desglose, revisarlos, asignar un responsable por ítem y persistirlos en PostgreSQL. No implementar precios, tareas ni seguimiento de responsables, informes, pagos ni sincronización en esta fase, más allá de la vista previa de §2. Un prototipo sin autenticación solo puede ejecutarse localmente y con datos autorizados.
 
 ### Fase 2 — Presupuestos y estimación de precios unitarios
 

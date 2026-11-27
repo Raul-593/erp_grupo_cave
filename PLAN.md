@@ -4,6 +4,7 @@
 
 | Tarea | Estado |
 | --- | --- |
+| Datos de demostración del prototipo en el proyecto 1 + módulos Planificación, Abastecimiento y Ejecución (lectura) + carga de fotografías en Ejecución | **Aprobado por etapas (2026-11-27).** Etapa E completada; etapas F y G requieren aprobación del usuario antes de empezar |
 | Fase 1 · Módulo Operación › Requerimiento con el diseño del prototipo `CAVE-ERP-v3` (reemplaza el plan visual 1.0b; abarca 1.0b, 1.2, 1.3 y 1.4) | **Aprobado; en progreso** — etapas A y B completadas; C preparada sin proveedor (falta SDK y adaptador); D sin iniciar |
 | Actualización de `AGENTS.md`: terminología proyecto/empresa, guía visual, ficha del proyecto, rubros y responsable por ítem | Completado (2026-11-26, solicitado por el usuario) |
 | Fase 1 · 1.0b — Interfaz web base (Next.js) | **Reemplazado** por la tarea anterior; se conservan la instalación y las decisiones técnicas V-D1–V-D9 |
@@ -12,7 +13,119 @@
 
 ---
 
-## Tarea actual: Fase 1 · Operación › Requerimiento
+## Tarea actual: datos de demostración y fotografías en Ejecución
+
+| Campo | Valor |
+| --- | --- |
+| Estado | **Aprobado por etapas (usuario, 2026-11-27):** «comencemos por la Etapa E y, una vez aprobada, la F, y así hasta la G». Se ejecutó con las recomendaciones E-D1 a E-D10. **Etapa E completada (ver E7); F y G sin iniciar** |
+| Fecha | 2026-11-26 |
+| Origen | Solicitud del usuario: todavía no hay clave de API; quiere avanzar guardando en la base, como si fueran del proyecto 1, los datos que el prototipo muestra en Operación › Requerimiento, Planificación, Abastecimiento y Ejecución, y habilitar la subida de fotos desde Ejecución |
+| Cambia el alcance vigente | Sí. `AGENTS.md` §2 y §6 excluían estos módulos de la Fase 1 y prohibían cargar los datos del prototipo; las fotografías eran de la Fase 7. Por eso este plan incluye actualizar `AGENTS.md` (E-D9) |
+| Fuera de alcance | Edición de planificación, compras, pagos y estados de montaje (solo lectura); cotizaciones desde el portal del proveedor; versiones/adendas; Cierre, Finanzas, Administración; autenticación; acceso desde el celular; etapa D (matriz editable) y adaptador de IA, que siguen como estaban |
+
+### E1. Situación encontrada
+
+- **Proyecto 1** en `erp`: «Prueba 1», contratante «Raul», sede Guayaquil, fechas 26–27 nov 2026, sin TDR. Hay 3 trabajadores («Trabajador 1–3»). No hay empresas, documentos, extracciones ni ítems.
+- **La matriz no puede guardarse sola:** `tdr_items` exige una extracción y esta exige un documento PDF. Hay que decidir el vehículo (E-D1).
+- **El prototipo solo contiene 10 ítems** (dice «10 de 52 mostrados»). Los otros 42 y el rubro 6 «Artistas y show» no existen en el archivo: no se inventan.
+- **El prototipo se contradice en sus totales:** los pagos listados suman $18.540; los porcentajes pagados por ítem suman $19.220; el pie dice $22.620 pagado y $26.572 de saldo; habla de «6 órdenes» y solo hay cinco (OC-014 a OC-018); la OC-015 tiene dos proveedores; la OC-018 es de hospedaje pero su pago dice «Flete de pantallas». El ítem «5.2» es el único del rubro 5 (el sistema lo numerará 5.1).
+- **Defecto en `.gitignore`:** la regla `storage/` también ignora el código de `apps/web/src/integrations/storage/` (`types.ts`, `local.ts`). Esos dos archivos **no están en el commit `7e62a31`**: un clon del repositorio no compila. Corrección propuesta en E-D10.
+- El repositorio tiene remoto en GitHub; el prototipo contiene nombres de personas (E-D5).
+
+### E2. Decisiones que necesito que apruebes (con recomendación)
+
+| ID | Decisión | Recomendación | Alternativa |
+| --- | --- | --- | --- |
+| E-D1 | Cómo entra la matriz sin IA | Un **documento de demostración** (PDF de una página generado por el sistema que dice «Documento de demostración — no es un TDR real») con una extracción de proveedor **`demo`**, modelo `prototipo-cave-erp-v3`, cuyo JSON cumple el contrato `tdr-v1`, importada a `tdr_items` y **confirmada**. Recorre el mismo camino que recorrerá la IA y queda rotulada «Datos de demostración» en pantalla | Cambiar el esquema para permitir matrices sin documento: más invasivo y toca restricciones ya probadas |
+| E-D2 | Qué se cambia en el proyecto 1 | Conservar el nombre «Prueba 1». Sustituir la ficha por la del prototipo: contratante nuevo **EP UNEMI** (el contratante «Raul» no se borra), proceso `LICS-EPUNEMI-2026-002`, objeto, monto 286.400 USD, sedes Guayaquil · Quito · Cuenca, plazo «10 al 23 de noviembre», fechas 2026-11-10 a 2026-11-23 (año tomado del rótulo «Noviembre 2026»), administradora del contrato y empresa ejecutora **Grupo CAVE** (primer registro de `companies`). Los valores actuales quedan anotados aquí para poder revertir | Renombrar también el proyecto a «Graduaciones UNEMI», o crear un proyecto nuevo y dejar «Prueba 1» intacto |
+| E-D3 | Totales e indicadores | **Se calculan siempre a partir de las filas guardadas**; no se guardan cifras literales. Las pantallas mostrarán 10 ítems en 5 rubros, pagado $19.220, saldo $29.972 y 5 órdenes, que no coinciden con los rótulos del prototipo | Guardar los literales del prototipo: mostraría cifras que no cuadran con sus propias filas |
+| E-D4 | Fotografías del prototipo (49) | **No se guardan**: no existen los archivos y no se fabrican imágenes. La columna «Fotos» cuenta las fotografías realmente subidas (empieza en 0) y «Verificado» se calcula con ellas | — |
+| E-D5 | Dónde vive el archivo con los datos | El **script** de carga se versiona; el **archivo de datos** (nombres de personas y montos del prototipo) queda en una carpeta **ignorada por Git** hasta que decidas lo contrario | Versionarlo: reproducible en otro equipo, pero publica esos nombres en GitHub |
+| E-D6 | Alcance de las pantallas | Planificación (Matriz, Cronograma, Actividades, Vista del cliente), Abastecimiento y Ejecución en **solo lectura** sobre la base; Requerimiento muestra la matriz confirmada con su responsable y las tarjetas de cotizaciones y comparativo. Lo único interactivo nuevo es la carga, vista y eliminación de fotos | Solo guardar los datos sin pantallas (no se podrían ver) o hacerlas editables (tarea bastante mayor) |
+| E-D7 | Reglas de las fotografías | JPEG, PNG y WebP, validadas por contenido real (no solo extensión); máximo 15 MB por foto (`EVIDENCE_MAX_BYTES`) y varias por envío; almacenamiento privado con clave `evidencias/<proyecto>/<ítem>/<uuid>`; descripción opcional; detección de duplicados por SHA-256 dentro del ítem. **Sin dependencias nuevas**: no se generan miniaturas ni se eliminan metadatos EXIF (la ubicación GPS de la cámara queda dentro del archivo, que es privado) | Miniaturas y limpieza de EXIF: requieren una librería de imágenes y tu aprobación de instalación |
+| E-D8 | Uso desde el celular | **No en esta tarea.** La aplicación solo escucha en `127.0.0.1` y no tiene autenticación; exponerla en la red exige antes usuarios y permisos (`AGENTS.md` §10). El campo de carga queda listo para abrir la cámara cuando eso exista | — |
+| E-D9 | `AGENTS.md` | Actualizar §2, §6, §7 y §12: módulos Planificación, Abastecimiento y Ejecución visibles en modo lectura con datos de demostración; excepción expresa para cargar los datos del prototipo en el proyecto 1; fotografías de evidencia adelantadas de la Fase 7 (sin revisión ni publicación al cliente) | — |
+| E-D10 | `.gitignore` | Cambiar `storage/` por `/storage/` para que solo se ignore la carpeta de archivos de la raíz y el código del adaptador quede rastreado | — |
+
+### E3. Qué se guarda y qué no
+
+| Sección | Se guarda (filas reales) | No se guarda |
+| --- | --- | --- |
+| Requerimiento | Ficha (E-D2); 10 ítems con rubro, producto, subproducto, descripción, cant., unidad, días y observación; 9 proveedores; 5 solicitudes de cotización (proveedor, rubro, fecha, estado) y 6 valores cotizados del rubro 1 con el elegido | «52 ítems en 6 rubros»; «12/14/4 ítems» por solicitud (solo existen 3, 3 y 1); versiones y adendas (solo la observación «Adenda 1» del ítem 2.2); el texto «Lectura del comparativo» (es un texto de IA simulado) |
+| Planificación | Responsable por ítem (6 trabajadores nuevos; los 3 actuales no se tocan), proveedor adjudicado, costo y estado del contrato; 10 actividades (las 9 del cronograma más «Certificado estructural del techo») con fechas, responsable, ítems vinculados, hito, dependencia y estado | El número de «actividades» por ítem (se cuenta de las reales); el estado de 5 actividades que el prototipo no indica (quedan sin estado); la descripción por rubro de la vista del cliente (se arma con los productos) |
+| Abastecimiento | 5 órdenes de compra, 9 líneas (ítem, monto pagado, responsable de pago) y 4 pagos (fecha, orden, concepto, forma, monto, respaldo). El estado de pago se calcula | Los conteos de «Documentos de la etapa» (18 facturas, 14 comprobantes…): no hay archivos |
+| Ejecución | Estado de montaje de los 10 ítems; 6 controles del checklist previo (responsable, fecha y hora, resultado) | Las 49 fotografías (E-D4); la maqueta del teléfono (es una vista de los mismos datos) |
+
+Interpretaciones mías que conviene que valides: «Depende de: Traslado / Montaje / Ceremonia» se enlaza con la actividad de nombre equivalente; las fechas sin año se toman como 2026; «Nómina interna» se registra como proveedor de tipo nómina; la moneda «$» es USD.
+
+### E4. Cambios en la base de datos (migración `0007`, solo añade tablas)
+
+| Tabla | Contenido |
+| --- | --- |
+| `suppliers` | Proveedores: nombre, tipo (`external`, `holding`, `payroll`), RUC opcional, activo |
+| `item_plans` | Uno por ítem: proveedor adjudicado, costo `numeric(14,2)`, estado del contrato |
+| `activities`, `activity_items` | Actividades del proyecto y sus ítems (varios por actividad) |
+| `purchase_orders`, `purchase_order_lines`, `payments` | Órdenes por proyecto, una línea por ítem con lo pagado, y pagos por orden |
+| `quote_requests`, `quote_lines` | Solicitudes de cotización y valores cotizados por ítem |
+| `item_execution`, `pre_event_checks` | Estado de montaje por ítem y checklist previo |
+| `item_evidences` | Fotografías: ítem, clave de almacenamiento, nombre original, tipo, tamaño, SHA-256, descripción |
+
+UUID, `timestamptz`, `numeric`, claves foráneas `RESTRICT`, `CHECK` y triggers de metadatos como en las tablas actuales. No modifica ni borra nada existente; las migraciones `0001`–`0006` no se tocan. Se valida en un esquema temporal dentro de una transacción revertida, luego en `erp_test` y por último en `erp`.
+
+### E5. Etapas
+
+Me detengo al final de cada etapa para tu revisión.
+
+| Etapa | Paso | Verificación |
+| --- | --- | --- |
+| **E. Esquema y datos** | 1. Corregir `.gitignore` (E-D10) y actualizar `AGENTS.md` (E-D9) | `git status` muestra los dos archivos del adaptador |
+| | 2. Respaldo de `erp` con `pg_dump` en `dumps/` (ignorado por Git) | Archivo creado; se informa tamaño |
+| | 3. Migración `0007` y repositorios nuevos en `packages/db` | `pnpm test:db`, `pnpm db:status` |
+| | 4. Script `pnpm db:seed:demo`: una sola transacción, solo esquema de desarrollo, valida el JSON contra `tdr-v1`, no hace nada si ya se cargó; borra el PDF si la transacción falla | Prueba en `erp_test` revertida; conteos por tabla tras ejecutarlo en `erp` |
+| **F. Pantallas** | 5. Pestañas Planificación, Abastecimiento y Ejecución; Requerimiento con la matriz confirmada, responsable, cotizaciones y comparativo; rótulo «Datos de demostración» | Revisión en el navegador integrado, modo claro/oscuro y vista estrecha |
+| **G. Fotografías** | 6. `POST /api/items/[id]/evidencias`, `GET /api/evidencias/[id]`, eliminación con confirmación; galería y carga por ítem en Ejecución; «Fotos» y «Verificado» calculados | Pruebas: JPEG/PNG/WebP válidos, archivo que no es imagen, vacío, demasiado grande, duplicado, fallo de base con limpieza del archivo; prueba real en el navegador con una imagen generada para la prueba, que se elimina al terminar |
+| Cierre | 7. `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`; actualizar `PLAN.md` y `MEMORY.md` | Todo en verde |
+
+Sin dependencias nuevas, sin commits ni push sin tu autorización.
+
+### E6. Riesgos
+
+- **Los datos de demostración quedan protegidos:** una extracción confirmada y sus ítems no se pueden borrar (triggers de la subfase 1.1). Retirarlos después exige un script de limpieza con autorización aparte; por eso el paso 2 hace un respaldo.
+- **Convivencia con el TDR real:** cuando proceses tu TDR en «Prueba 1» habrá dos documentos en el mismo proyecto; los módulos nuevos leen la extracción confirmada. Si prefieres mantenerlos separados, la alternativa de E-D2 (proyecto nuevo) lo evita.
+- **Modelo financiero provisional:** órdenes, pagos y costos se modelan como los muestra el prototipo (lo pagado por línea y los pagos por orden son datos independientes). La Fase 6 deberá rediseñarlo (pagos parciales asignados a obligaciones, facturas, comprobantes).
+- **Datos ilustrativos:** se rotulan en pantalla y en la base (`provider = 'demo'`); no deben usarse como referencia de precios.
+- **Fotos sin miniaturas:** una galería con muchas fotos grandes cargará lento; aceptable en local.
+- **Sin autenticación:** solo local, como hasta ahora.
+
+### E7. Resultado
+
+**2026-11-27 — Etapa E completada** (pasos 1–4). Pendiente: tu revisión y aprobación antes de la etapa F.
+
+- **`.gitignore` y `AGENTS.md`:** `/storage/` solo ignora la carpeta de la raíz (el adaptador `apps/web/src/integrations/storage/` ya aparece para versionar); `/apps/web/scripts/local/` ignora el archivo de datos. `AGENTS.md` §2 («Vista previa con datos de demostración»), §6, §7 y §12 actualizados.
+- **Respaldo:** `dumps/erp_antes_0007_2026-11-27.dump` (47 KB, esquema `erp` antes de la migración; ignorado por Git).
+- **Migración `0007_planificacion_abastecimiento_ejecucion`:** 12 tablas (`suppliers`, `item_plans`, `activities`, `activity_items`, `purchase_orders`, `purchase_order_lines`, `payments`, `quote_requests`, `quote_lines`, `item_execution`, `pre_event_checks`, `item_evidences`) y 4 funciones. Validada en un esquema temporal dentro de una transacción revertida (up 0001–0007, 48 comprobaciones, down 0007–0001, sin objetos restantes); aplicada en `erp_test` y `erp`. `pnpm db:status`: 0 pendientes.
+- **`packages/db`:** constantes de dominio de los `CHECK` nuevos; `src/demo/` (tipos del conjunto de datos y `seedDemo`, que corre en la transacción del llamador y no hace nada si el proyecto ya tiene la demostración); repositorios de lectura `matrix.ts` (matriz confirmada vigente, ítems con responsable/plan/orden/pago calculado/montaje, indicadores calculados en SQL) y `operations.ts` (proveedores, actividades, pagos, checklist previo, cotizaciones).
+- **Script `pnpm db:seed:demo`** (`apps/web/scripts/seed-demo.ts`; `--dry-run` no escribe, `--project=<uuid>` elige otro proyecto): solo esquema de desarrollo; valida el JSON contra el contrato `tdr-v1` antes de escribir; genera el PDF de demostración (`src/lib/simple-pdf.ts`), lo guarda con el adaptador de almacenamiento y lo borra si la transacción falla. Los datos viven en `apps/web/scripts/local/demo-cave-v3.ts` (ignorado por Git).
+- **Carga en `erp`, proyecto «Prueba 1»:** ensayada antes en una transacción revertida. Filas creadas: 1 empresa (Grupo CAVE), 1 contratante (EP UNEMI), 6 trabajadores, 9 proveedores, 1 documento, 1 extracción `demo` confirmada, 10 ítems con responsable, 10 planes, 5 órdenes con 9 líneas, 4 pagos, 10 actividades con 10 vínculos a ítems, 10 estados de montaje, 6 controles previos, 5 solicitudes de cotización con 6 valores. Una segunda ejecución no hace nada. El PDF existe en `storage/` y su tamaño y SHA-256 coinciden con la base. No se tocaron el contratante «Raul» ni «Trabajador 1–3».
+- **Valores anteriores de «Prueba 1»** (para revertir la ficha): contratante «Raul», sede Guayaquil, fechas 2026-11-26 a 2026-11-27; proceso, objeto, monto, moneda, plazo, administrador, empresa y extracción de la ficha vacíos.
+- **Indicadores calculados sobre los datos cargados:** 10 ítems en 5 rubros; 5 responsables; 6 proveedores (1 del holding); costo asignado $49.192; 5 órdenes por $47.572; pagado $19.220; saldo de órdenes $28.352 más $1.620 sin orden (nómina) = $29.972 por pagar; compras internas $7.800; 3 ítems pagados por completo; 6 montados; 0 fotografías. Los pagos registrados suman $18.540 (no se concilian con lo pagado por línea: así está en el prototipo).
+- **Verificación:** `pnpm lint`, `pnpm typecheck` y `pnpm build` sin errores; `pnpm test`: 59 pruebas de base (incluye 6 de las tablas nuevas y 8 de la carga con un conjunto sintético) y 79 de web (incluye 3 del PDF). En el navegador integrado, Requerimiento muestra el documento, la ficha y los 10 ítems rotulados «Datos de demostración», sin errores en consola.
+
+Cambios respecto a lo propuesto:
+
+- `purchase_order_lines` guarda también `amount` (lo comprometido en la orden), además de lo pagado y el responsable de pago.
+- Dos reglas en la base, como defensa adicional: las tablas nuevas solo aceptan ítems de una matriz **confirmada**, y un ítem solo puede vincularse a una actividad, orden o solicitud de **su mismo proyecto**.
+- El script vive en `apps/web` (necesita el contrato y el almacenamiento) y la lógica de carga en `packages/db`. Para poder usar el adaptador desde Node se cambió una importación de `local.ts` a `./types.ts`.
+- Se adelantó de la etapa F un ajuste mínimo en Requerimiento: la demostración se rotula como tal y no como «Propuesta IA». La columna Responsable sigue mostrando «—» hasta la etapa F.
+- Los repositorios de fotografías (`item_evidences`) se escriben en la etapa G; la tabla ya existe.
+
+Incoherencias del prototipo guardadas tal cual: la OC-015 agrupa dos proveedores; el pago de la OC-018 (hospedaje) dice «Flete de pantallas»; el ítem 1.3 figura adjudicado a Montajes del Litoral en el comparativo y a Estructuras Andinas en planificación. De las dos variantes del nombre de una actividad se guardó «Prueba de sonido, luces y video».
+
+Sin commits. Siguiente paso propuesto: etapa F (pantallas de Planificación, Abastecimiento y Ejecución en lectura), cuando la apruebes.
+
+---
+
+## Tarea en pausa: Fase 1 · Operación › Requerimiento
 
 | Campo | Valor |
 | --- | --- |

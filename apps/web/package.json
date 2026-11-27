@@ -10,7 +10,8 @@
     "start": "next start -H 127.0.0.1 -p 3000",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:seed:demo": "node --env-file=../../.env scripts/seed-demo.ts"
   },
   "dependencies": {
     "@erp/db": "workspace:*",

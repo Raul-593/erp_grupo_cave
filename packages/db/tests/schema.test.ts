@@ -6,7 +6,23 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createPool, EXTRACTION_STATUSES, getPgErrorCode, ITEM_SOURCES, loadDbConfig, PgErrorCode } from '../src/index.ts';
+import {
+  ACTIVITY_STATUSES,
+  CHECK_RESULTS,
+  CONTRACT_STATUSES,
+  createPool,
+  EVIDENCE_MIME_TYPES,
+  EXTRACTION_STATUSES,
+  getPgErrorCode,
+  ITEM_SOURCES,
+  loadDbConfig,
+  MOUNT_STATUSES,
+  PAYMENT_METHODS,
+  PAYMENT_SUPPORTS,
+  PgErrorCode,
+  QUOTE_STATUSES,
+  SUPPLIER_KINDS,
+} from '../src/index.ts';
 
 const config = loadDbConfig('test');
 let pool: pg.Pool;
@@ -101,15 +117,27 @@ describe('estructura', () => {
     expect(rows[0]?.schema).toBe(config.schema);
   });
 
-  it('tiene las tablas de Fase 1', async () => {
+  it('tiene las tablas de las migraciones 0001-0007', async () => {
     const { rows } = await client.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = $1 AND tablename <> 'pgmigrations' ORDER BY 1`,
       [config.schema],
     );
     expect(rows.map((row) => row.tablename)).toEqual([
+      'activities',
+      'activity_items',
       'clients',
       'companies',
+      'item_evidences',
+      'item_execution',
+      'item_plans',
+      'payments',
+      'pre_event_checks',
       'projects',
+      'purchase_order_lines',
+      'purchase_orders',
+      'quote_lines',
+      'quote_requests',
+      'suppliers',
       'tdr_documents',
       'tdr_extractions',
       'tdr_item_assignments',
@@ -124,11 +152,15 @@ describe('estructura', () => {
       [config.schema],
     );
     expect(rows.map((row) => row.proname)).toEqual([
+      'check_activity_dependency',
       'check_assignment_worker_active',
+      'check_item_same_project',
       'check_project_ficha_extraction',
       'protect_tdr_extraction',
       'protect_tdr_items',
+      'require_confirmed_item',
       'set_row_metadata',
+      'tdr_item_project_id',
     ]);
     for (const row of rows) expect(row.proconfig).toEqual([`search_path=${config.schema}`]);
   });
@@ -145,6 +177,22 @@ describe('estructura', () => {
     for (const status of EXTRACTION_STATUSES) expect(statusDef).toContain(`'${status}'`);
     const sourceDef = await definition('tdr_items_source_valid');
     for (const source of ITEM_SOURCES) expect(sourceDef).toContain(`'${source}'`);
+    const pairs: [string, readonly string[]][] = [
+      ['suppliers_kind_valid', SUPPLIER_KINDS],
+      ['item_plans_contract_status_valid', CONTRACT_STATUSES],
+      ['activities_status_valid', ACTIVITY_STATUSES],
+      ['payments_method_valid', PAYMENT_METHODS],
+      ['payments_support_valid', PAYMENT_SUPPORTS],
+      ['quote_requests_status_valid', QUOTE_STATUSES],
+      ['item_execution_mount_status_valid', MOUNT_STATUSES],
+      ['pre_event_checks_result_valid', CHECK_RESULTS],
+      ['item_evidences_mime_type_image', EVIDENCE_MIME_TYPES],
+    ];
+    for (const [constraint, values] of pairs) {
+      const def = await definition(constraint);
+      // Mismos valores, ni más ni menos: cada uno aparece entre comillas en el CHECK.
+      expect(def.match(/'[^']+'/g)?.map((value) => value.slice(1, -1)).sort()).toEqual([...values].sort());
+    }
   });
 
   it('devuelve date y numeric como texto exacto', async () => {
@@ -482,5 +530,164 @@ describe('trabajadores y responsables', () => {
     await client.query(`INSERT INTO tdr_item_assignments (tdr_item_id, worker_id) VALUES ($1, $2)`, [itemId, worker]);
     expect(await failureCode(`DELETE FROM tdr_items WHERE id = $1`, [itemId])).toBe(PgErrorCode.restrictViolation);
     expect(await failureCode(`DELETE FROM workers WHERE id = $1`, [worker])).toBe(PgErrorCode.restrictViolation);
+  });
+});
+
+describe('planificación, abastecimiento y ejecución (0007)', () => {
+  /** Proyecto con una matriz de dos ítems; `confirmed` indica si la extracción queda confirmada. */
+  async function seedMatrix(confirmed = true, char = 'a'): Promise<{ projectId: string; extractionId: string; items: [string, string] }> {
+    const { projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId, char), 'processed');
+    const items: [string, string] = [await seedItem(extractionId, 1), await seedItem(extractionId, 2)];
+    if (confirmed) {
+      await client.query(`UPDATE tdr_extractions SET status = 'confirmed', confirmed_at = now() WHERE id = $1`, [extractionId]);
+    }
+    return { projectId, extractionId, items };
+  }
+  const seedSupplier = (name = 'Proveedor sintético') => insertId(`INSERT INTO suppliers (name) VALUES ($1) RETURNING id`, [name]);
+  const seedWorker = () => insertId(`INSERT INTO workers (full_name) VALUES ('Trabajador sintético') RETURNING id`, []);
+
+  it('solo admite registros sobre ítems de una matriz confirmada', async () => {
+    const draft = await seedMatrix(false);
+    for (const table of ['item_plans', 'item_execution']) {
+      expect(await failureCode(`INSERT INTO ${table} (tdr_item_id) VALUES ($1)`, [draft.items[0]])).toBe(PgErrorCode.checkViolation);
+    }
+    expect(
+      await failureCode(
+        `INSERT INTO item_evidences (tdr_item_id, storage_provider, storage_key, original_filename, mime_type, size_bytes, sha256)
+         VALUES ($1, 'local', 'evidencias/x.jpg', 'x.jpg', 'image/jpeg', 10, $2)`,
+        [draft.items[0], sha('b')],
+      ),
+    ).toBe(PgErrorCode.checkViolation);
+    await client.query(`UPDATE tdr_extractions SET status = 'confirmed', confirmed_at = now() WHERE id = $1`, [draft.extractionId]);
+    expect(await failureCode(`INSERT INTO item_plans (tdr_item_id) VALUES ($1)`, [draft.items[0]])).toBeUndefined();
+  });
+
+  it('valida proveedores y el plan de cada ítem', async () => {
+    const { items } = await seedMatrix();
+    const supplier = await seedSupplier();
+    expect(await failureCode(`INSERT INTO suppliers (name) VALUES ('  PROVEEDOR sintético ')`)).toBe(PgErrorCode.uniqueViolation);
+    expect(await failureCode(`INSERT INTO suppliers (name, kind) VALUES ('Otro', 'x')`)).toBe(PgErrorCode.checkViolation);
+    const plan = (item: string, columns: string, values: string) =>
+      failureCode(`INSERT INTO item_plans (tdr_item_id, ${columns}) VALUES ($1, ${values})`, [item]);
+    await client.query(`INSERT INTO item_plans (tdr_item_id, supplier_id, planned_cost, contract_status) VALUES ($1, $2, 8400, 'signed')`, [
+      items[0],
+      supplier,
+    ]);
+    expect(await plan(items[0], 'planned_cost', '1')).toBe(PgErrorCode.uniqueViolation);
+    expect(await plan(items[1], 'planned_cost', '-1')).toBe(PgErrorCode.checkViolation);
+    expect(await plan(items[1], 'contract_status', `'x'`)).toBe(PgErrorCode.checkViolation);
+    expect(await failureCode(`DELETE FROM suppliers WHERE id = $1`, [supplier])).toBe(PgErrorCode.restrictViolation);
+    const { rows } = await client.query<{ planned_cost: string; version: number }>(
+      `UPDATE item_plans SET planned_cost = 9000.5 WHERE tdr_item_id = $1 RETURNING planned_cost, version`,
+      [items[0]],
+    );
+    expect(rows[0]).toEqual({ planned_cost: '9000.50', version: 2 });
+  });
+
+  it('valida actividades, sus dependencias y sus ítems', async () => {
+    const a = await seedMatrix();
+    const b = await seedMatrix(true, 'c');
+    const worker = await seedWorker();
+    const activity = (projectId: string, extra = '', values = '') =>
+      `INSERT INTO activities (project_id, name, start_date, end_date${extra}) VALUES ('${projectId}', 'Actividad', '2026-12-01', '2026-12-02'${values}) RETURNING id`;
+    const first = await insertId(activity(a.projectId), []);
+    const other = await insertId(activity(b.projectId), []);
+    expect(
+      await failureCode(`INSERT INTO activities (project_id, name, start_date, end_date) VALUES ($1, 'X', '2026-12-02', '2026-12-01')`, [
+        a.projectId,
+      ]),
+    ).toBe(PgErrorCode.checkViolation);
+    expect(await failureCode(activity(a.projectId, ', status', `, 'x'`))).toBe(PgErrorCode.checkViolation);
+    expect(await failureCode(activity(a.projectId, ', worker_id, whole_team', `, '${worker}', true`))).toBe(PgErrorCode.checkViolation);
+    expect(await failureCode(`UPDATE activities SET depends_on_activity_id = id WHERE id = $1`, [first])).toBe(PgErrorCode.checkViolation);
+    expect(await failureCode(`UPDATE activities SET depends_on_activity_id = $2 WHERE id = $1`, [first, other])).toBe(
+      PgErrorCode.checkViolation,
+    );
+    await client.query(`INSERT INTO activity_items (activity_id, tdr_item_id) VALUES ($1, $2), ($1, $3)`, [first, a.items[0], a.items[1]]);
+    expect(await failureCode(`INSERT INTO activity_items (activity_id, tdr_item_id) VALUES ($1, $2)`, [first, a.items[0]])).toBe(
+      PgErrorCode.uniqueViolation,
+    );
+    expect(await failureCode(`INSERT INTO activity_items (activity_id, tdr_item_id) VALUES ($1, $2)`, [first, b.items[0]])).toBe(
+      PgErrorCode.checkViolation,
+    );
+  });
+
+  it('valida órdenes de compra, líneas y pagos', async () => {
+    const a = await seedMatrix();
+    const b = await seedMatrix(true, 'c');
+    const order = await insertId(`INSERT INTO purchase_orders (project_id, code) VALUES ($1, 'OC-001') RETURNING id`, [a.projectId]);
+    expect(await failureCode(`INSERT INTO purchase_orders (project_id, code) VALUES ($1, 'OC-001')`, [a.projectId])).toBe(
+      PgErrorCode.uniqueViolation,
+    );
+    expect(await failureCode(`INSERT INTO purchase_orders (project_id, code) VALUES ($1, 'OC-001')`, [b.projectId])).toBeUndefined();
+    const line = (item: string, amount: string, paid: string) =>
+      failureCode(`INSERT INTO purchase_order_lines (purchase_order_id, tdr_item_id, amount, paid_amount) VALUES ($1, $2, ${amount}, ${paid})`, [
+        order,
+        item,
+      ]);
+    expect(await line(a.items[0], '8400', '4200')).toBeUndefined();
+    expect(await line(a.items[0], '1', '0')).toBe(PgErrorCode.uniqueViolation);
+    expect(await line(a.items[1], '-1', '0')).toBe(PgErrorCode.checkViolation);
+    expect(await line(a.items[1], '1', '-1')).toBe(PgErrorCode.checkViolation);
+    expect(await line(b.items[0], '1', '0')).toBe(PgErrorCode.checkViolation);
+    const payment = (method: string, amount: string, support: string) =>
+      failureCode(
+        `INSERT INTO payments (purchase_order_id, paid_on, concept, method, amount, support) VALUES ($1, '2026-12-01', 'Anticipo', '${method}', ${amount}, '${support}')`,
+        [order],
+      );
+    expect(await payment('transfer', '4200', 'invoice_and_receipt')).toBeUndefined();
+    expect(await payment('transfer', '0', 'none')).toBe(PgErrorCode.checkViolation);
+    expect(await payment('bitcoin', '1', 'none')).toBe(PgErrorCode.checkViolation);
+    expect(await payment('cash', '1', 'x')).toBe(PgErrorCode.checkViolation);
+    expect(await failureCode(`DELETE FROM purchase_orders WHERE id = $1`, [order])).toBe(PgErrorCode.restrictViolation);
+  });
+
+  it('valida cotizaciones y admite una sola elegida por ítem', async () => {
+    const a = await seedMatrix();
+    const b = await seedMatrix(true, 'c');
+    const request = async (supplierName: string) =>
+      insertId(`INSERT INTO quote_requests (project_id, supplier_id, rubro, status) VALUES ($1, $2, 'Rubro', 'quoted') RETURNING id`, [
+        a.projectId,
+        await seedSupplier(supplierName),
+      ]);
+    const first = await request('Proveedor uno');
+    const second = await request('Proveedor dos');
+    expect(
+      await failureCode(
+        `INSERT INTO quote_requests (project_id, supplier_id, rubro, status) SELECT project_id, supplier_id, rubro, status FROM quote_requests WHERE id = $1`,
+        [first],
+      ),
+    ).toBe(PgErrorCode.uniqueViolation);
+    const line = (requestId: string, item: string, awarded: boolean) =>
+      failureCode(`INSERT INTO quote_lines (quote_request_id, tdr_item_id, amount, awarded) VALUES ($1, $2, 100, $3)`, [requestId, item, awarded]);
+    expect(await line(first, a.items[0], true)).toBeUndefined();
+    expect(await line(second, a.items[0], true)).toBe(PgErrorCode.uniqueViolation);
+    expect(await line(second, a.items[0], false)).toBeUndefined();
+    expect(await line(first, b.items[0], false)).toBe(PgErrorCode.checkViolation);
+  });
+
+  it('valida el estado de montaje, el checklist previo y las fotografías', async () => {
+    const { projectId, items } = await seedMatrix();
+    expect(await failureCode(`INSERT INTO item_execution (tdr_item_id, mount_status) VALUES ($1, 'mounted')`, [items[0]])).toBeUndefined();
+    expect(await failureCode(`INSERT INTO item_execution (tdr_item_id, mount_status) VALUES ($1, 'x')`, [items[1]])).toBe(
+      PgErrorCode.checkViolation,
+    );
+    expect(await failureCode(`INSERT INTO pre_event_checks (project_id, description, result) VALUES ($1, 'Control', 'x')`, [projectId])).toBe(
+      PgErrorCode.checkViolation,
+    );
+    const evidence = (item: string, storageKey: string, mime: string, size: number, char: string) =>
+      failureCode(
+        `INSERT INTO item_evidences (tdr_item_id, storage_provider, storage_key, original_filename, mime_type, size_bytes, sha256)
+         VALUES ($1, 'local', $2, 'foto.jpg', $3, $4, $5)`,
+        [item, storageKey, mime, size, sha(char)],
+      );
+    expect(await evidence(items[0], 'evidencias/p/1.jpg', 'image/jpeg', 100, 'b')).toBeUndefined();
+    expect(await evidence(items[0], 'evidencias/p/2.jpg', 'image/jpeg', 100, 'b')).toBe(PgErrorCode.uniqueViolation);
+    expect(await evidence(items[1], 'evidencias/p/1.jpg', 'image/png', 100, 'c')).toBe(PgErrorCode.uniqueViolation);
+    expect(await evidence(items[1], 'evidencias/p/3.webp', 'image/webp', 100, 'b')).toBeUndefined();
+    expect(await evidence(items[1], 'evidencias/p/4.pdf', 'application/pdf', 100, 'd')).toBe(PgErrorCode.checkViolation);
+    expect(await evidence(items[1], 'evidencias/../5.jpg', 'image/jpeg', 100, 'e')).toBe(PgErrorCode.checkViolation);
+    expect(await evidence(items[1], 'evidencias/p/6.jpg', 'image/jpeg', 0, 'f')).toBe(PgErrorCode.checkViolation);
   });
 });

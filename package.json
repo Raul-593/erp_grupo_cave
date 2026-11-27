@@ -12,6 +12,7 @@
     "db:migrate": "pnpm --filter @erp/db run db:migrate",
     "db:migrate:test": "pnpm --filter @erp/db run db:migrate:test",
     "db:status": "pnpm --filter @erp/db run db:status",
+    "db:seed:demo": "pnpm --filter web run db:seed:demo",
     "test:db": "pnpm --filter @erp/db run test",
     "typecheck": "pnpm -r run typecheck",
     "dev": "pnpm --filter web dev",

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getLatestExtraction, listClients, listDocumentsByProject, listWorkers } from '@erp/db';
+import { DEMO_PROVIDER, getLatestExtraction, listClients, listDocumentsByProject, listWorkers } from '@erp/db';
 import { ProjectValueForm } from '@/components/forms/ProjectValueForm';
 import { AutoRefresh } from '@/components/requerimiento/AutoRefresh';
 import { DeleteDocumentButton } from '@/components/requerimiento/DeleteDocumentButton';
@@ -73,6 +73,8 @@ export default async function RequerimientoPage() {
     proposal = parsed.ok ? parsed.output : null;
   }
   const codes = proposal ? itemCodes(proposal.items) : [];
+  // Datos de demostración (AGENTS.md §2): se rotulan como tales, nunca como propuesta de la IA.
+  const demo = extraction?.provider === DEMO_PROVIDER;
   const rubroCount = proposal ? new Set(proposal.items.map((row) => row.rubro.trim().toLowerCase())).size : 0;
   const processDisabledReason = !ai.ready
     ? 'Configura la IA en .env (ver el aviso de la tarjeta).'
@@ -175,7 +177,7 @@ export default async function RequerimientoPage() {
           contractAdministrator: project.contractAdministrator,
         }}
         clients={clients.map(({ id, name, taxId }) => ({ id, name, taxId }))}
-        scope={proposal ? `${proposal.items.length} ítems en ${rubroCount} rubros (propuesta IA)` : 'Sin matriz todavía'}
+        scope={proposal ? `${proposal.items.length} ítems en ${rubroCount} rubros (${demo ? 'datos de demostración' : 'propuesta IA'})` : 'Sin matriz todavía'}
         documentLabel={latest ? latest.originalFilename : 'Sin cargar'}
       />
 
@@ -201,7 +203,7 @@ export default async function RequerimientoPage() {
             <tbody>
               {proposal && proposal.items.length > 0 ? (
                 proposal.items.map((row, index) => (
-                  <tr key={`${row.item}-${index}`} className="align-top text-vi">
+                  <tr key={`${row.item}-${index}`} className={demo ? 'align-top' : 'align-top text-vi'}>
                     <td>
                       <b className="font-semibold tabular-nums">{codes[index]}</b>
                     </td>
@@ -241,7 +243,13 @@ export default async function RequerimientoPage() {
         <div className="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-4 py-2.5 text-[11.5px] text-mut">
           <span>
             {proposal ? `${proposal.items.length} ítems · ${rubroCount} rubros · ` : '0 ítems · 0 rubros'}
-            {proposal ? <b className="font-semibold text-vi">◆ propuesta IA, solo lectura hasta la etapa D</b> : null}
+            {proposal ? (
+              demo ? (
+                <b className="font-semibold text-wa">datos de demostración (ilustrativos), matriz confirmada</b>
+              ) : (
+                <b className="font-semibold text-vi">◆ propuesta IA, solo lectura hasta la etapa D</b>
+              )
+            ) : null}
           </span>
           <span className="ml-auto">
             {workers.length === 0 ? (

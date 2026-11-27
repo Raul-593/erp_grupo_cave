@@ -1,4 +1,4 @@
-import type { ExtractionSummary } from '@erp/db';
+import { DEMO_PROVIDER, type ExtractionSummary } from '@erp/db';
 import { FichaGrid, Pill } from '@/components/ui';
 import type { ExtractionOutput } from '@/domain/tdr-extraction/contract';
 import { summarizeOutput } from '@/domain/tdr-extraction/contract';
@@ -26,6 +26,8 @@ export function ExtractionPanel({ extraction, output }: { extraction: Extraction
   const active = extraction.status === 'pending' || extraction.status === 'processing';
   const seconds = extraction.durationMs === null ? null : Math.round(extraction.durationMs / 100) / 10;
   const summary = output ? summarizeOutput(output) : null;
+  // Datos de demostración (AGENTS.md §2): no provienen de una IA ni de un TDR real.
+  const demo = extraction.provider === DEMO_PROVIDER;
 
   return (
     <div className="border-t border-line px-4 py-3.5" aria-live="polite">
@@ -33,8 +35,8 @@ export function ExtractionPanel({ extraction, output }: { extraction: Extraction
         <span className="text-[9px] font-semibold tracking-[0.1em] text-mut2 uppercase">Último procesamiento</span>
         <Pill tone={tone}>{label}</Pill>
         {summary ? (
-          <Pill tone="vi">
-            ◆ Propuesta IA · {summary.items} ítems en {summary.rubros} rubros
+          <Pill tone={demo ? 'wa' : 'vi'}>
+            {demo ? 'Datos de demostración' : '◆ Propuesta IA'} · {summary.items} ítems en {summary.rubros} rubros
           </Pill>
         ) : null}
         <span className="text-[11.5px] text-mut">
@@ -57,15 +59,19 @@ export function ExtractionPanel({ extraction, output }: { extraction: Extraction
 
       {output ? (
         <div className="mt-3 overflow-hidden rounded-md border border-line">
-          <div className="bg-vib px-3 py-1.5 text-[9px] font-semibold tracking-[0.1em] text-vi uppercase">
-            ◆ Ficha propuesta por la IA (sin aplicar)
+          <div
+            className={`px-3 py-1.5 text-[9px] font-semibold tracking-[0.1em] uppercase ${demo ? 'bg-wab text-wa' : 'bg-vib text-vi'}`}
+          >
+            {demo
+              ? 'Ficha de demostración · datos ilustrativos del prototipo, no provienen de un TDR'
+              : '◆ Ficha propuesta por la IA (sin aplicar)'}
           </div>
           <FichaGrid
             items={[
-              { label: 'Contratante', value: dash(output.ficha.contratante), ai: true },
-              { label: 'RUC', value: dash(output.ficha.ruc_contratante), ai: true },
-              { label: 'Proceso', value: dash(output.ficha.codigo_proceso), ai: true },
-              { label: 'Objeto', value: dash(output.ficha.objeto), ai: true },
+              { label: 'Contratante', value: dash(output.ficha.contratante), ai: !demo },
+              { label: 'RUC', value: dash(output.ficha.ruc_contratante), ai: !demo },
+              { label: 'Proceso', value: dash(output.ficha.codigo_proceso), ai: !demo },
+              { label: 'Objeto', value: dash(output.ficha.objeto), ai: !demo },
               {
                 label: 'Valor',
                 value:
@@ -74,16 +80,16 @@ export function ExtractionPanel({ extraction, output }: { extraction: Extraction
                     : `${formatNumber(output.ficha.monto)} ${output.ficha.moneda ?? ''}${
                         output.ficha.incluye_iva === null ? '' : output.ficha.incluye_iva ? ' · con IVA' : ' · sin IVA'
                       }`,
-                ai: true,
+                ai: !demo,
               },
-              { label: 'Sedes', value: output.ficha.sedes.length ? output.ficha.sedes.join(' · ') : '—', ai: true },
+              { label: 'Sedes', value: output.ficha.sedes.length ? output.ficha.sedes.join(' · ') : '—', ai: !demo },
               {
                 label: 'Plazo',
                 value: [output.ficha.fecha_inicio, output.ficha.fecha_fin, output.ficha.plazo].filter(Boolean).join(' · ') || '—',
-                ai: true,
+                ai: !demo,
               },
-              { label: 'Administrador', value: dash(output.ficha.administrador_contrato), ai: true },
-              { label: 'Observación', value: dash(output.ficha.observacion), ai: true },
+              { label: 'Administrador', value: dash(output.ficha.administrador_contrato), ai: !demo },
+              { label: 'Observación', value: dash(output.ficha.observacion), ai: !demo },
             ]}
           />
         </div>
@@ -94,7 +100,9 @@ export function ExtractionPanel({ extraction, output }: { extraction: Extraction
           <summary className="cursor-pointer text-[11.5px] font-medium text-bl">
             {extraction.status === 'failed'
               ? 'Ver la respuesta recibida y los problemas encontrados (para ajustar el prompt)'
-              : 'Ver el JSON original de la IA'}
+              : demo
+                ? 'Ver el JSON de demostración'
+                : 'Ver el JSON original de la IA'}
           </summary>
           <pre className="mt-2 max-h-[420px] overflow-auto rounded-md bg-bg p-3 text-[11px] leading-relaxed whitespace-pre-wrap text-ink2">
             {JSON.stringify(extraction.rawResponse, null, 2)}

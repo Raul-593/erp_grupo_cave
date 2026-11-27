@@ -7,8 +7,12 @@ node_modules/
 .env.*
 !.env.example
 
-# Almacenamiento local privado de archivos (PDF de TDR, evidencias)
-storage/
+# Almacenamiento local privado de archivos (PDF de TDR, evidencias). Solo la carpeta de la
+# raíz: el código del adaptador vive en apps/web/src/integrations/storage/ y sí se versiona.
+/storage/
+
+# Datos locales de demostración (nombres y montos del prototipo; decisión E-D5 de PLAN.md)
+/apps/web/scripts/local/
 
 # Volcados y respaldos de base de datos
 *.dump

@@ -26,3 +26,25 @@ export {
   type ExtractionSummary,
   type ExtractionMetadata,
 } from './extractions.ts';
+export {
+  getConfirmedMatrix,
+  listMatrixItems,
+  getMatrixTotals,
+  type ConfirmedMatrix,
+  type MatrixItem,
+  type MatrixTotals,
+} from './matrix.ts';
+export {
+  listSuppliers,
+  listActivities,
+  listPayments,
+  listPreEventChecks,
+  listQuoteRequests,
+  listQuoteLines,
+  type Supplier,
+  type Activity,
+  type Payment,
+  type PreEventCheck,
+  type QuoteRequest,
+  type QuoteLine,
+} from './operations.ts';

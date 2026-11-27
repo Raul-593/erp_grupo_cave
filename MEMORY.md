@@ -1,42 +1,45 @@
 # MEMORY.md — erp_v1
 
 ## 1. Estado actual
-- Tarea «Operación › Requerimiento» (prototipo CAVE-ERP-v3) aprobada. Etapas A (base, shell, Proyectos/Requerimiento/Trabajadores) y B (carga privada de PDF, verificada con el TDR real) completas. Etapa C lista **sin proveedor**: contrato `tdr-v1`, prompt `tdr-extraccion-v1`, interfaz común, servicio, estados y pantalla; falta el adaptador. Etapa D (matriz editable + responsable) pendiente.
-- AGENTS.md (2026-11-26): proyecto/contratante/empresa, guía visual, ficha con monto transcrito, rubro › producto › subproducto, un responsable por ítem.
-- Sin commits: todo el trabajo está en el árbol de trabajo.
+- **Tarea actual (PLAN.md, «datos de demostración y fotografías»), aprobada por etapas:** E completada (2026-11-27); **F y G esperan aprobación del usuario, una por una**.
+- El proyecto 1 («Prueba 1») tiene cargados los datos del prototipo como extracción `demo` confirmada: 10 ítems, 5 órdenes, 4 pagos, 10 actividades, 6 controles previos, 5 cotizaciones.
+- Tarea «Operación › Requerimiento» en pausa: etapas A–C hechas (C sin proveedor de IA; falta SDK y adaptador), D pendiente.
+- Commits hasta `7e62a31`; todo lo de la etapa E está sin confirmar en el árbol de trabajo.
 
 ## 2. Decisiones aprobadas
-- BD local `grupo_cave_v1`, usuario `grupo_cave` (propietario), PostgreSQL 18.4; esquemas `erp` (dev) y `erp_test` (pruebas).
-- pnpm workspace + TypeScript; migraciones SQL con node-pg-migrate + `pg`; nada se instala sin aprobación del usuario, paquete por paquete.
-- Estados de extracción: pending, processing, processed, failed, confirmed, superseded; una confirmada y un procesamiento activo por documento; FK RESTRICT; triggers de inmutabilidad.
-- IA multiproveedor; proveedor y modelo **solo en `.env`** (`AI_PROVIDER`, `AI_MODEL`, `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`); cada intento guarda proveedor, modelo, versión de prompt y de esquema.
-- «Valor del proyecto» = `projects.contract_amount` (+ moneda, IVA); componentes reutilizables `ProjectValueFields` / `ProjectValueForm`.
-- Procesamiento en el proceso del servidor local (cola, concurrencia, tiempo máximo); reevaluar antes de Netlify.
-- Evitar funciones exclusivas de PostgreSQL 18 (Supabase).
+- BD local `grupo_cave_v1`, usuario `grupo_cave`, PostgreSQL 18.4; esquemas `erp` (dev) y `erp_test` (pruebas). Evitar funciones exclusivas de PG 18.
+- pnpm workspace + TypeScript; migraciones SQL con node-pg-migrate + `pg`; nada se instala sin aprobación, paquete por paquete.
+- Extracción: pending, processing, processed, failed, confirmed, superseded; una confirmada y un procesamiento activo por documento; FK RESTRICT; triggers de inmutabilidad.
+- IA multiproveedor; proveedor y modelo solo en `.env`. El usuario aún no tiene clave de API.
+- Demostración (AGENTS.md §2): solo proyecto 1 local; rotulada «Datos de demostración»; indicadores siempre calculados de las filas; fotos reales (no se fabrican); archivo de datos fuera de Git; módulos nuevos solo lectura; sin acceso desde celular hasta tener autenticación.
+- Fotos: JPEG/PNG/WebP por contenido, 15 MB (`EVIDENCE_MAX_BYTES`), clave `evidencias/<proyecto>/<ítem>/<uuid>`, sin miniaturas ni limpieza de EXIF (sin dependencias nuevas).
 
 ## 3. Componentes creados
-- `@erp/db`: config, pool, `withTransaction`, SQLSTATE, repositorios (clients, projects, workers, documents, extractions).
-- `apps/web`: shell visual; formularios; carga/visor/eliminación de PDF; almacenamiento `FileStorage` local; contrato `domain/tdr-extraction/contract.ts`; prompt `prompts/tdr-extraccion/v1.ts`; IA en `integrations/ai/` (types, config, registry); `server/services/tdr-extraction.ts` + `server/extraction-runner.ts`.
+- `@erp/db`: config, pool, `withTransaction`; repositorios clients, projects, workers, documents, extractions, `matrix` (matriz confirmada, ítems, totales) y `operations` (proveedores, actividades, pagos, checklist, cotizaciones); `demo/` (`seedDemo`, tipos).
+- `apps/web`: shell; Proyectos, Requerimiento, Trabajadores; carga de PDF y `FileStorage` local; contrato `tdr-v1`, prompt `tdr-extraccion-v1`, IA (types, config, registry), servicio y orquestador de extracción; `lib/simple-pdf.ts`; `scripts/seed-demo.ts`.
 
 ## 4. Archivos relevantes
-- `packages/db/migrations/0001`–`0006` (aplicadas; no editarlas).
-- `.env` lo mantiene el usuario; nunca versionarlo ni mostrar su contenido. `.env.example` documenta todas las variables.
-- `storage/` (PDF privados, ignorado por Git).
+- `packages/db/migrations/0001`–`0007` (aplicadas en `erp` y `erp_test`; no editarlas).
+- `apps/web/scripts/local/demo-cave-v3.ts`: datos del prototipo, ignorado por Git. `pnpm db:seed:demo [--dry-run]`.
+- `dumps/erp_antes_0007_2026-11-27.dump`: respaldo previo a `0007` (ignorado por Git).
+- `.env` lo mantiene el usuario; nunca versionarlo ni mostrarlo. `storage/` (raíz) ignorado.
 
 ## 5. Tareas y bloqueos
-- **AL ELEGIR PROVEEDOR DE IA HAY QUE INSTALAR SU SDK OFICIAL** (con aprobación del usuario): `@anthropic-ai/sdk`, `openai` o `@google/genai` en `apps/web`. Luego crear su adaptador en `apps/web/src/integrations/ai/` (PDF como documento + `EXTRACTION_JSON_SCHEMA` como salida estructurada + errores con `AiProviderError`), registrarlo en `registry.ts` y verificar en la documentación vigente PDF, salida estructurada y límites. Sin eso, «Procesar TDR con IA» queda deshabilitado.
-- El usuario debe autorizar enviar el TDR real al proveedor elegido (AGENTS.md §10).
-- No crear datos de prueba en `erp`: el usuario usa su TDR real.
+- **No empezar la etapa F ni la G sin aprobación expresa.** F: pestañas Planificación, Abastecimiento, Ejecución (lectura) y Requerimiento con responsable, cotizaciones y comparativo. G: fotos por ítem (repositorio de `item_evidences`, rutas, galería).
+- Al elegir proveedor de IA: instalar su SDK oficial con aprobación, escribir el adaptador en `apps/web/src/integrations/ai/` y registrarlo. El usuario debe autorizar enviar TDR reales.
+- La demostración está confirmada: no se puede borrar por medios normales; quitarla exige un script aparte con autorización.
 
 ## 6. Aprendizajes
+- `.gitignore`: usar `/storage/` (con barra inicial); `storage/` ignoraba también el código del adaptador.
+- Las tablas de `0007` solo aceptan ítems de una matriz confirmada y del mismo proyecto (triggers).
+- Filas creadas en una misma transacción comparten `created_at`: ordenar por otra columna (`sort_order`, nombre).
+- Scripts de Node sin empaquetador: importaciones relativas con extensión `.ts`, sin alias `@/`.
 - Migraciones sin esquema fijo; funciones con `SET search_path FROM CURRENT`. RESTRICT lanza 23001.
-- `pg` devuelve `date` y `numeric` como texto. Servidor en America/Bogota (= Guayaquil).
-- TypeScript 7 no sirve a Next.js/typescript-eslint: `apps/web` fija TS 6.0.3 y ESLint 9.39.5.
-- En Windows, pnpm a veces falla al renombrar carpetas: `--config.child-concurrency=1`.
-- zod 4: campo ausente en FormData con `z.unknown().transform()` da «nonoptional»; usar `z.string().default('')`.
-- Valores importados de un módulo `'use client'` llegan como referencia al servidor: constantes compartidas en `lib/`.
+- `pg` devuelve `date` y `numeric` como texto: sumar en SQL, no en JavaScript.
+- TypeScript 7 no sirve a Next.js: `apps/web` fija TS 6.0.3 y ESLint 9.39.5. En Windows, pnpm: `--config.child-concurrency=1` si falla al renombrar.
+- El usuario suele tener su propio servidor en el puerto 3000: navegar a `http://127.0.0.1:3000` en lugar de iniciar otro.
+- El prototipo se contradice en totales y órdenes (detalle en PLAN.md E1 y E7): no «corregir» sus datos.
 
 ## 7. Próximos pasos
-- Elegir proveedor → instalar SDK → adaptador → primera prueba con el TDR real; ajustar el prompt creando `v2.ts`.
-- Etapa D: importar la propuesta a `tdr_items`, edición, responsable por ítem, «Aplicar» ficha y confirmar.
-- El prototipo contiene nombres y montos ilustrativos: no usarlos como datos ni versionarlos sin permiso.
+- Esperar la revisión de la etapa E; con aprobación, etapa F y después G.
+- Pendiente aparte: proveedor de IA y etapa D (matriz editable).
