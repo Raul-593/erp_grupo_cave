@@ -13,6 +13,7 @@ import {
   getMatrixTotals,
   getPgErrorCode,
   getUser,
+  isCheckAssignedTo,
   isItemAssignedTo,
   listAuditForEntity,
   listItemEvidences,
@@ -167,5 +168,21 @@ describe('fotografías con su autor y auditoría', () => {
     expect(history.map((h) => h.action).sort()).toEqual(['evidence.delete', 'evidence.upload']);
     expect(history[0]).toMatchObject({ userName: 'Autora' });
     expect(history.find((h) => h.action === 'evidence.upload')?.details).toEqual({ itemId });
+  });
+});
+
+describe('alcance en el checklist previo', () => {
+  it('el empleado de campo alcanza solo los controles de los que es responsable', async () => {
+    const { projectId } = await seed();
+    const mine = await worker('Responsable del control');
+    const other = await worker('Otra persona');
+    const CHECK = `INSERT INTO pre_event_checks (project_id, description, worker_id) VALUES ($1, $2, $3) RETURNING id`;
+    const assigned = await id(CHECK, [projectId, 'Control asignado', mine]);
+    const unassigned = await id(CHECK, [projectId, 'Control sin responsable', null]);
+
+    expect(await isCheckAssignedTo(client, assigned, mine)).toBe(true);
+    expect(await isCheckAssignedTo(client, assigned, other)).toBe(false);
+    expect(await isCheckAssignedTo(client, unassigned, mine)).toBe(false);
+    expect(await isCheckAssignedTo(client, randomUUID(), mine)).toBe(false);
   });
 });

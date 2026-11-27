@@ -11,7 +11,7 @@
 - pnpm workspace + TypeScript; migraciones SQL con node-pg-migrate + `pg`; nada se instala sin aprobación.
 - IA multiproveedor; proveedor y modelo solo en `.env`. El usuario aún no tiene clave de API.
 - Demostración solo en el proyecto 1 local, rotulada; indicadores calculados de las filas. Pagos: lo pagado = suma de `payment_allocations` (la base impide escribirlo).
-- Usuarios (2026-11-27, AGENTS.md §2): un tipo por usuario (admin, field, accounting, supplier); permisos en código (`domain/access/permissions.ts`); campo = ítems de su trabajador, edita proveedor y costo en Planificación, sube fotos y borra solo las suyas; contabilidad solo lee; proveedor solo ve «Portal en preparación». Ingreso local `dev` sin contraseña; Supabase Auth en la parte S. Historial `audit_log` en la misma transacción que cada cambio.
+- Usuarios (2026-11-27, AGENTS.md §2): un tipo por usuario (admin, field, accounting, supplier); permisos en código (`domain/access/permissions.ts`); campo = ítems de su trabajador, edita proveedor y costo en Planificación, sube fotos y borra solo las suyas, cambia el montaje de sus ítems (`mount.update`) y marca cumple/no cumple en los controles previos que tiene a cargo (`checks.update`); contabilidad solo lee; proveedor solo ve «Portal en preparación». Ingreso local `dev` sin contraseña; Supabase Auth en la parte S. Historial `audit_log` en la misma transacción que cada cambio.
 
 ## 3. Componentes creados
 - `@erp/db`: repositorios (clients, projects, workers, documents, extractions, matrix, operations, suppliers, ediciones, evidences) y `users`, `access` (alcance por trabajador), `audit`; `getMatrixTotals(..., { workerId })` filtra indicadores; `demo/`.

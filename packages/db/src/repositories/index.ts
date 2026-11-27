@@ -84,5 +84,5 @@ export {
   type EvidenceInput,
 } from './evidences.ts';
 export { listUsers, getUser, createUser, updateUser, recordLogin, type AppUser, type AppUserInput } from './users.ts';
-export { isItemAssignedTo, listWorkerProjectIds } from './access.ts';
+export { isItemAssignedTo, isCheckAssignedTo, listWorkerProjectIds } from './access.ts';
 export { recordAudit, listAuditForEntity, type AuditEntry, type AuditRecord } from './audit.ts';

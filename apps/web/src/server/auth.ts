@@ -5,7 +5,15 @@
  */
 import { cache } from 'react';
 import { redirect } from 'next/navigation';
-import { getUser, isItemAssignedTo, listWorkerProjectIds, recordAudit, type Queryable, type UserRole } from '@erp/db';
+import {
+  getUser,
+  isCheckAssignedTo,
+  isItemAssignedTo,
+  listWorkerProjectIds,
+  recordAudit,
+  type Queryable,
+  type UserRole,
+} from '@erp/db';
 import { can, homePath, scopeOf, type Permission } from '@/domain/access/permissions';
 import { authProvider } from '@/integrations/auth/config';
 import { AuthConfigError } from '@/integrations/auth/types';
@@ -55,10 +63,14 @@ export async function requirePageUser(...permissions: Permission[]): Promise<Ses
   return user;
 }
 
-/** Destino que se puede pedir a `authorize`: un ítem o un proyecto, para comprobar el alcance. */
+/**
+ * Destino que se puede pedir a `authorize` para comprobar el alcance: un ítem, un proyecto o un
+ * control del checklist previo (el empleado de campo solo alcanza los que tiene a cargo).
+ */
 export interface AccessTarget {
   itemId?: string;
   projectId?: string;
+  checkId?: string;
 }
 
 export type Authorized = { ok: true; user: SessionUser } | { ok: false; message: string; status: 401 | 403 };
@@ -70,6 +82,7 @@ export async function inScope(user: SessionUser, target: AccessTarget): Promise<
   if (scope.kind === 'none') return false;
   if (target.itemId && !(await isItemAssignedTo(db(), target.itemId, scope.workerId))) return false;
   if (target.projectId && !(await listWorkerProjectIds(db(), scope.workerId)).includes(target.projectId)) return false;
+  if (target.checkId && !(await isCheckAssignedTo(db(), target.checkId, scope.workerId))) return false;
   return true;
 }
 

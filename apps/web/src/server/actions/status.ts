@@ -27,12 +27,15 @@ export async function updateActivityField(input: unknown): Promise<InlineResult>
   return { ok: true };
 }
 
-/** Guarda el estado de montaje de un ítem. */
+/**
+ * Guarda el estado de montaje de un ítem. Superusuario: cualquier ítem; empleado de campo: solo
+ * los ítems de los que es responsable.
+ */
 export async function updateMountStatus(input: unknown): Promise<InlineResult> {
   const parsed = mountChangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
   const { itemId, version, value } = parsed.data;
-  const auth = await authorize('schedule.write', { itemId });
+  const auth = await authorize('mount.update', { itemId });
   if (!auth.ok) return auth;
   try {
     if ((await getItemProjectId(db(), itemId)) === null) return { ok: false, message: 'El ítem ya no existe. Recarga la página.' };
@@ -47,12 +50,16 @@ export async function updateMountStatus(input: unknown): Promise<InlineResult> {
   return { ok: true };
 }
 
-/** Guarda el resultado de un control del checklist previo al evento. */
+/**
+ * Guarda el resultado (pendiente, cumple, no cumple) de un control del checklist previo al
+ * evento. Superusuario: cualquiera; empleado de campo: solo los controles de los que es
+ * responsable (`pre_event_checks.worker_id`).
+ */
 export async function updateCheckResult(input: unknown): Promise<InlineResult> {
   const parsed = checkChangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
   const { id, version, value } = parsed.data;
-  const auth = await authorize('schedule.write');
+  const auth = await authorize('checks.update', { checkId: id });
   if (!auth.ok) return auth;
   try {
     await withTransaction(db(), async (tx) => {

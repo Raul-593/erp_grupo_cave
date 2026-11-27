@@ -3,6 +3,7 @@
 import { useState, useTransition, type ReactNode } from 'react';
 import type { ActivityStatus, CheckResult, ContractStatus, MountStatus } from '@erp/db';
 import { useCan } from '@/components/access';
+import type { Permission } from '@/domain/access/permissions';
 import type { InlineResult } from '@/lib/action-state';
 import { formatAmount } from '@/lib/format';
 import { ACTIVITY_STATUS, CHECK_RESULT, CONTRACT_STATUS, MOUNT_STATUS } from '@/lib/labels';
@@ -337,24 +338,28 @@ export function ActivityCells({
   );
 }
 
-/** Lista desplegable que guarda un único valor al cambiarlo. */
+/**
+ * Lista desplegable que guarda un único valor al cambiarlo. Sin `permission`, muestra el valor
+ * como texto (el servidor vuelve a comprobar el permiso y el alcance).
+ */
 function SavingSelect({
   label,
   value,
   options,
   onSave,
+  permission,
   className = '',
 }: {
   label: string;
   value: string;
   options: readonly (readonly [value: string, label: string])[];
   onSave: (value: string) => Promise<InlineResult>;
+  permission: Permission;
   className?: string;
 }) {
   const { pending, error, save } = useInlineSave<'value'>();
   const [draft, setDraft] = useState('');
-  // Montaje y checklist: solo quien puede cambiar el cronograma; los demás ven el valor.
-  const canEdit = useCan('schedule.write');
+  const canEdit = useCan(permission);
   if (!canEdit) return <span>{options.find(([optionValue]) => optionValue === value)?.[1] ?? value}</span>;
   return (
     <>
@@ -382,7 +387,7 @@ function SavingSelect({
 
 const MOUNT_OPTIONS = Object.entries(MOUNT_STATUS) as [MountStatus, string][];
 
-/** Estado de montaje de un ítem. */
+/** Estado de montaje de un ítem: superusuario y el empleado de campo responsable del ítem. */
 export function MountSelect({
   itemId,
   itemLabel,
@@ -399,6 +404,7 @@ export function MountSelect({
       label={`Estado de montaje del ítem ${itemLabel}`}
       value={status}
       options={MOUNT_OPTIONS}
+      permission="mount.update"
       className="!min-w-[124px]"
       onSave={(value) => updateMountStatus({ itemId, version: version === null ? '' : String(version), value })}
     />
@@ -409,7 +415,7 @@ const CHECK_OPTIONS = (Object.entries(CHECK_RESULT) as [CheckResult, (typeof CHE
   ([value, [label]]) => [value, label] as const,
 );
 
-/** Resultado de un control del checklist previo. */
+/** Resultado de un control del checklist previo: superusuario y el empleado de campo responsable del control. */
 export function CheckResultSelect({
   id,
   description,
@@ -426,6 +432,7 @@ export function CheckResultSelect({
       label={`Resultado de: ${description}`}
       value={result}
       options={CHECK_OPTIONS}
+      permission="checks.update"
       className="!min-w-[116px]"
       onSave={(value) => updateCheckResult({ id, version: String(version), value })}
     />

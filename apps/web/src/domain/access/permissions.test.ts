@@ -13,6 +13,8 @@ describe('permisos por rol', () => {
       'matrix.read',
       'items.plan_cost',
       'schedule.read',
+      'mount.update',
+      'checks.update',
       'evidence.read',
       'evidence.upload',
       'evidence.delete_own',
@@ -23,7 +25,7 @@ describe('permisos por rol', () => {
   });
 
   it('contabilidad solo lee, más el permiso reservado de aprobar costos', () => {
-    const writes = PERMISSIONS.filter((p) => /\.(write|manage|assign|plan_cost|plan_contract|upload|delete_own|delete_any)$/.test(p));
+    const writes = PERMISSIONS.filter((p) => /\.(write|manage|assign|update|plan_cost|plan_contract|upload|delete_own|delete_any)$/.test(p));
     for (const permission of writes) expect(can('accounting', permission)).toBe(false);
     expect(can('accounting', 'procurement.read')).toBe(true);
     expect(can('accounting', 'costs.approve')).toBe(true);

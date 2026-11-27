@@ -72,7 +72,7 @@ Adelanto de la Fase 3 (migración `0009`). Cada usuario tiene **un** tipo:
 | Tipo (en pantalla) | Clave | Qué puede hacer |
 | --- | --- | --- |
 | Superusuario | `admin` | Todo el sistema y la gestión de usuarios (Administración › Usuarios). Puede haber varios; siempre queda al menos uno activo |
-| Empleado de campo | `field` | Vinculado a su trabajador. Ve solo los proyectos e ítems donde es el responsable (`tdr_item_assignments`); cambia **proveedor y costo del ítem** en Planificación, sube fotografías en sus ítems y elimina solo las que él subió. No ve órdenes, pagos, cotizaciones, documentos TDR ni catálogos |
+| Empleado de campo | `field` | Vinculado a su trabajador. Ve solo los proyectos e ítems donde es el responsable (`tdr_item_assignments`); cambia **proveedor y costo del ítem** en Planificación, sube fotografías en sus ítems y elimina solo las que él subió. En Ejecución cambia el **estado de montaje** de sus ítems en el checklist de entregables (permiso `mount.update`) y ve solo los controles del **checklist previo al evento** de los que es responsable (`pre_event_checks.worker_id`) y marca si cumplen o no (permiso `checks.update`, decisión del usuario 2026-11-27). No ve órdenes, pagos, cotizaciones, documentos TDR ni catálogos |
 | Contabilidad | `accounting` | Ve todos los proyectos, documentos, órdenes, pagos y cotizaciones **sin cambiarlos**. Aprobará costos cuando exista su módulo (permiso `costs.approve` reservado, sin pantalla) |
 | Proveedor | `supplier` | Vinculado a su proveedor. Solo ve la página «Portal del proveedor: en preparación»; responderá sus cotizaciones cuando exista el portal (permiso `quotes.respond` reservado) |
 

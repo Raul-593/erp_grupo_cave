@@ -24,3 +24,12 @@ export async function listWorkerProjectIds(db: Queryable, workerId: string): Pro
   );
   return rows.map((row) => row.projectId);
 }
+
+/** ¿El trabajador es el responsable del control del checklist previo? */
+export async function isCheckAssignedTo(db: Queryable, checkId: string, workerId: string): Promise<boolean> {
+  const { rows } = await db.query<{ ok: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM pre_event_checks WHERE id = $1 AND worker_id = $2) AS ok`,
+    [checkId, workerId],
+  );
+  return rows[0]?.ok ?? false;
+}

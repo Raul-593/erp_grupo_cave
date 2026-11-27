@@ -24,8 +24,18 @@ export const PERMISSIONS = [
   'items.plan_contract',
   /** Ver actividades, estado de montaje y checklist previo (campo: solo sus ítems). */
   'schedule.read',
-  /** Cambiar actividades, estado de montaje y checklist previo. */
+  /** Cambiar actividades (responsable y estado). */
   'schedule.write',
+  /**
+   * Cambiar el estado de montaje de un ítem en el checklist de entregables (campo: solo sus
+   * ítems). Decisión del usuario, 2026-11-27.
+   */
+  'mount.update',
+  /**
+   * Marcar si cumple o no cumple un control del checklist previo al evento (campo: solo los
+   * controles de los que es responsable). Decisión del usuario, 2026-11-27.
+   */
+  'checks.update',
   /** Ver órdenes de compra y pagos. */
   'procurement.read',
   /** Registrar y cambiar órdenes de compra y pagos. */
@@ -63,6 +73,8 @@ const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>>> = {
     'matrix.read',
     'items.plan_cost',
     'schedule.read',
+    'mount.update',
+    'checks.update',
     'evidence.read',
     'evidence.upload',
     'evidence.delete_own',
@@ -97,7 +109,8 @@ export const ROLE_LABELS: Readonly<Record<UserRole, string>> = {
 
 export const ROLE_DESCRIPTIONS: Readonly<Record<UserRole, string>> = {
   admin: 'Ve y cambia todo el sistema, y gestiona los usuarios.',
-  field: 'Ve solo los ítems donde es responsable; cambia su proveedor y costo y sube fotografías.',
+  field:
+    'Ve solo los ítems donde es responsable; cambia su proveedor y costo, el estado de montaje y las fotografías de sus ítems, y marca si cumplen los controles previos que tiene a cargo.',
   accounting: 'Ve todos los proyectos, órdenes y pagos sin cambiarlos. Aprobará costos cuando exista su módulo.',
   supplier: 'Responderá sus cotizaciones cuando exista el portal del proveedor. Hoy no ve otros datos.',
 };
