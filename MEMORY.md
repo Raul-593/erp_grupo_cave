@@ -1,47 +1,42 @@
 # MEMORY.md — erp_v1
 
 ## 1. Estado actual
-- Fase 1, subfase 1.1 (base de datos) completada el 2026-11-26. Tablas creadas en `erp` y `erp_test`.
-- AGENTS.md actualizado: IA multiproveedor con conexión común (interfaz + adaptador por proveedor).
-- 1.0b aprobado: 14 paquetes instalados en `apps/web` (solo `package.json`, sin código por indicación del usuario).
-- `apps/web` fija `typescript` 6.0.3 y `eslint` 9.39.5 (exactas) por compatibilidad con Next.js 16.4.6; sin problemas de peers.
+- Tarea «Operación › Requerimiento» (prototipo CAVE-ERP-v3) aprobada. Etapas A (base, shell, Proyectos/Requerimiento/Trabajadores) y B (carga privada de PDF, verificada con el TDR real) completas. Etapa C lista **sin proveedor**: contrato `tdr-v1`, prompt `tdr-extraccion-v1`, interfaz común, servicio, estados y pantalla; falta el adaptador. Etapa D (matriz editable + responsable) pendiente.
+- AGENTS.md (2026-11-26): proyecto/contratante/empresa, guía visual, ficha con monto transcrito, rubro › producto › subproducto, un responsable por ítem.
 - Sin commits: todo el trabajo está en el árbol de trabajo.
 
 ## 2. Decisiones aprobadas
-- BD local `grupo_cave_v1`, usuario `grupo_cave` (propietario, no superusuario), `localhost:5432`, PostgreSQL 18.4.
-- pnpm workspace (`packages/*`, `apps/*`) y TypeScript; Node 24 ejecuta `.ts` con eliminación de tipos; `tsc --noEmit`.
-- Nada se instala sin aprobación explícita del usuario, paquete por paquete.
-- Migraciones SQL con node-pg-migrate + `pg`; esquema `erp` (dev) y `erp_test` (pruebas) en la misma base.
-- Tablas/columnas en inglés, salvo columnas del contrato TDR en español; estados con CHECK:
-  pending, processing, processed, failed, confirmed, superseded.
-- Una extracción confirmada y un procesamiento activo por documento; FK RESTRICT; triggers de inmutabilidad.
-- IA multiproveedor: no restringir a un modelo ni compañía; `provider` + `model` por intento (D13).
-- Evitar funciones exclusivas de PostgreSQL 18 (compatibilidad con Supabase).
+- BD local `grupo_cave_v1`, usuario `grupo_cave` (propietario), PostgreSQL 18.4; esquemas `erp` (dev) y `erp_test` (pruebas).
+- pnpm workspace + TypeScript; migraciones SQL con node-pg-migrate + `pg`; nada se instala sin aprobación del usuario, paquete por paquete.
+- Estados de extracción: pending, processing, processed, failed, confirmed, superseded; una confirmada y un procesamiento activo por documento; FK RESTRICT; triggers de inmutabilidad.
+- IA multiproveedor; proveedor y modelo **solo en `.env`** (`AI_PROVIDER`, `AI_MODEL`, `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`); cada intento guarda proveedor, modelo, versión de prompt y de esquema.
+- «Valor del proyecto» = `projects.contract_amount` (+ moneda, IVA); componentes reutilizables `ProjectValueFields` / `ProjectValueForm`.
+- Procesamiento en el proceso del servidor local (cola, concurrencia, tiempo máximo); reevaluar antes de Netlify.
+- Evitar funciones exclusivas de PostgreSQL 18 (Supabase).
 
 ## 3. Componentes creados
-- `@erp/db`: config (valida env y esquemas), pool con search_path, `withTransaction`, códigos SQLSTATE, constantes de dominio.
-- Scripts: `db:check`, `db:migrate`, `db:migrate:test`, `db:status`, `test:db`, `typecheck`.
+- `@erp/db`: config, pool, `withTransaction`, SQLSTATE, repositorios (clients, projects, workers, documents, extractions).
+- `apps/web`: shell visual; formularios; carga/visor/eliminación de PDF; almacenamiento `FileStorage` local; contrato `domain/tdr-extraction/contract.ts`; prompt `prompts/tdr-extraccion/v1.ts`; IA en `integrations/ai/` (types, config, registry); `server/services/tdr-extraction.ts` + `server/extraction-runner.ts`.
 
 ## 4. Archivos relevantes
-- `packages/db/migrations/0001`–`0005` (aplicadas; no editarlas: crear nuevas migraciones).
-- `packages/db/src/*`, `scripts/*`, `tests/schema.test.ts` (27 pruebas), `vitest.config.ts`.
-- Raíz: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.gitignore`, `.env.example`.
-- `.env` lo mantiene el usuario; nunca versionarlo ni mostrar su contenido.
+- `packages/db/migrations/0001`–`0006` (aplicadas; no editarlas).
+- `.env` lo mantiene el usuario; nunca versionarlo ni mostrar su contenido. `.env.example` documenta todas las variables.
+- `storage/` (PDF privados, ignorado por Git).
 
 ## 5. Tareas y bloqueos
-- Pendiente del usuario: autorizar el inicio del código de 1.0b; pgAdmin (opcional).
-- Hosting del procesamiento IA (límites de Netlify) se decide en 1.3.
-- `.env.example` tiene líneas CLAUDE_* del usuario; alinear nombres (p. ej. ANTHROPIC_API_KEY, AI_PROVIDER/AI_MODEL) en 1.3.
+- **AL ELEGIR PROVEEDOR DE IA HAY QUE INSTALAR SU SDK OFICIAL** (con aprobación del usuario): `@anthropic-ai/sdk`, `openai` o `@google/genai` en `apps/web`. Luego crear su adaptador en `apps/web/src/integrations/ai/` (PDF como documento + `EXTRACTION_JSON_SCHEMA` como salida estructurada + errores con `AiProviderError`), registrarlo en `registry.ts` y verificar en la documentación vigente PDF, salida estructurada y límites. Sin eso, «Procesar TDR con IA» queda deshabilitado.
+- El usuario debe autorizar enviar el TDR real al proveedor elegido (AGENTS.md §10).
+- No crear datos de prueba en `erp`: el usuario usa su TDR real.
 
 ## 6. Aprendizajes
-- Migraciones sin esquema fijo; funciones con `SET search_path FROM CURRENT`.
-- `ON DELETE RESTRICT` lanza `restrict_violation` (23001), no `foreign_key_violation`.
-- `pg` configurado para devolver `date` y `numeric` como texto.
-- Zona horaria del servidor America/Bogota (equivale a Guayaquil, UTC-5).
-- pnpm 12.21 y TypeScript 7 (nativo) en `packages/db`; vitest 5 carga `.env` en `vitest.config.ts`.
-- TypeScript 7 no expone la API JS clásica: Next.js y typescript-eslint necesitan TS ≤6.0.x.
-- En Windows, pnpm falla a veces al renombrar carpetas grandes ("did not settle"); usar `--config.child-concurrency=1`.
+- Migraciones sin esquema fijo; funciones con `SET search_path FROM CURRENT`. RESTRICT lanza 23001.
+- `pg` devuelve `date` y `numeric` como texto. Servidor en America/Bogota (= Guayaquil).
+- TypeScript 7 no sirve a Next.js/typescript-eslint: `apps/web` fija TS 6.0.3 y ESLint 9.39.5.
+- En Windows, pnpm a veces falla al renombrar carpetas: `--config.child-concurrency=1`.
+- zod 4: campo ausente en FormData con `z.unknown().transform()` da «nonoptional»; usar `z.string().default('')`.
+- Valores importados de un módulo `'use client'` llegan como referencia al servidor: constantes compartidas en `lib/`.
 
 ## 7. Próximos pasos
-- Tras aprobar 1.0b: crear `apps/web` a mano, instalar lo aprobado, CRUD de clientes/eventos, tabla editable.
-- Después: 1.2 carga de PDF, 1.3 IA multiproveedor, 1.4 persistir tabla.
+- Elegir proveedor → instalar SDK → adaptador → primera prueba con el TDR real; ajustar el prompt creando `v2.ts`.
+- Etapa D: importar la propuesta a `tdr_items`, edición, responsable por ítem, «Aplicar» ficha y confirmar.
+- El prototipo contiene nombres y montos ilustrativos: no usarlos como datos ni versionarlos sin permiso.

@@ -177,6 +177,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@erp/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@tanstack/react-table':
         specifier: ^9.3.1
         version: 9.3.1(@types/react@19.3.3)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)

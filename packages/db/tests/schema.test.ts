@@ -62,20 +62,20 @@ async function insertId(sql: string, params: unknown[]): Promise<string> {
 const sha = (char: string): string => char.repeat(64);
 const RAW = { items: [{ item: 1 }, { item: 2 }] };
 
-async function seedEvent(): Promise<{ clientId: string; eventId: string }> {
+async function seedProject(): Promise<{ clientId: string; projectId: string }> {
   const clientId = await insertId(`INSERT INTO clients (name) VALUES ('Cliente sintético') RETURNING id`, []);
-  const eventId = await insertId(
-    `INSERT INTO events (client_id, name, start_date, end_date) VALUES ($1, 'Evento sintético', '2026-12-01', '2026-12-03') RETURNING id`,
+  const projectId = await insertId(
+    `INSERT INTO projects (client_id, name, start_date, end_date) VALUES ($1, 'Proyecto sintético', '2026-12-01', '2026-12-03') RETURNING id`,
     [clientId],
   );
-  return { clientId, eventId };
+  return { clientId, projectId };
 }
 
-async function seedDocument(eventId: string, char = 'a'): Promise<string> {
+async function seedDocument(projectId: string, char = 'a'): Promise<string> {
   return insertId(
-    `INSERT INTO tdr_documents (event_id, storage_provider, storage_key, original_filename, mime_type, size_bytes, sha256)
+    `INSERT INTO tdr_documents (project_id, storage_provider, storage_key, original_filename, mime_type, size_bytes, sha256)
      VALUES ($1, 'local', $2, 'tdr.pdf', 'application/pdf', 1024, $3) RETURNING id`,
-    [eventId, `tdr/${randomUUID()}.pdf`, sha(char)],
+    [projectId, `tdr/${randomUUID()}.pdf`, sha(char)],
   );
 }
 
@@ -89,8 +89,8 @@ async function seedExtraction(documentId: string, status: 'pending' | 'processed
 
 async function seedItem(extractionId: string, itemNumber: number, source: 'ai' | 'manual' = 'manual'): Promise<string> {
   return insertId(
-    `INSERT INTO tdr_items (extraction_id, item_number, producto, subproducto, descripcion, source, source_index)
-     VALUES ($1, $2, 'Sonido', 'Micrófono inalámbrico', 'Profesional', $3, $4) RETURNING id`,
+    `INSERT INTO tdr_items (extraction_id, item_number, rubro, producto, subproducto, descripcion, source, source_index)
+     VALUES ($1, $2, 'Audio, luces y video', 'Micrófono inalámbrico', 'Sonido', 'Profesional', $3, $4) RETURNING id`,
     [extractionId, itemNumber, source, source === 'ai' ? itemNumber - 1 : null],
   );
 }
@@ -101,12 +101,21 @@ describe('estructura', () => {
     expect(rows[0]?.schema).toBe(config.schema);
   });
 
-  it('tiene las cinco tablas de Fase 1', async () => {
+  it('tiene las tablas de Fase 1', async () => {
     const { rows } = await client.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = $1 AND tablename <> 'pgmigrations' ORDER BY 1`,
       [config.schema],
     );
-    expect(rows.map((row) => row.tablename)).toEqual(['clients', 'events', 'tdr_documents', 'tdr_extractions', 'tdr_items']);
+    expect(rows.map((row) => row.tablename)).toEqual([
+      'clients',
+      'companies',
+      'projects',
+      'tdr_documents',
+      'tdr_extractions',
+      'tdr_item_assignments',
+      'tdr_items',
+      'workers',
+    ]);
   });
 
   it('fija el search_path de las funciones de trigger en su propio esquema', async () => {
@@ -114,7 +123,13 @@ describe('estructura', () => {
       `SELECT proname, proconfig FROM pg_proc WHERE pronamespace = $1::regnamespace ORDER BY 1`,
       [config.schema],
     );
-    expect(rows.map((row) => row.proname)).toEqual(['protect_tdr_extraction', 'protect_tdr_items', 'set_row_metadata']);
+    expect(rows.map((row) => row.proname)).toEqual([
+      'check_assignment_worker_active',
+      'check_project_ficha_extraction',
+      'protect_tdr_extraction',
+      'protect_tdr_items',
+      'set_row_metadata',
+    ]);
     for (const row of rows) expect(row.proconfig).toEqual([`search_path=${config.schema}`]);
   });
 
@@ -138,24 +153,24 @@ describe('estructura', () => {
   });
 });
 
-describe('clientes y eventos', () => {
-  it('rechaza un evento con un cliente inexistente', async () => {
-    expect(await failureCode(`INSERT INTO events (client_id, name) VALUES ($1, 'X')`, [randomUUID()])).toBe(
+describe('contratantes y proyectos', () => {
+  it('rechaza un proyecto con un contratante inexistente', async () => {
+    expect(await failureCode(`INSERT INTO projects (client_id, name) VALUES ($1, 'X')`, [randomUUID()])).toBe(
       PgErrorCode.foreignKeyViolation,
     );
   });
 
   it('rechaza fecha de fin anterior a la de inicio', async () => {
-    const { clientId } = await seedEvent();
+    const { clientId } = await seedProject();
     expect(
-      await failureCode(`INSERT INTO events (client_id, name, start_date, end_date) VALUES ($1, 'X', '2026-12-03', '2026-12-01')`, [
+      await failureCode(`INSERT INTO projects (client_id, name, start_date, end_date) VALUES ($1, 'X', '2026-12-03', '2026-12-01')`, [
         clientId,
       ]),
     ).toBe(PgErrorCode.checkViolation);
   });
 
-  it('no permite borrar un cliente con eventos (RESTRICT)', async () => {
-    const { clientId } = await seedEvent();
+  it('no permite borrar un contratante con proyectos (RESTRICT)', async () => {
+    const { clientId } = await seedProject();
     expect(await failureCode(`DELETE FROM clients WHERE id = $1`, [clientId])).toBe(PgErrorCode.restrictViolation);
   });
 
@@ -166,7 +181,7 @@ describe('clientes y eventos', () => {
   });
 
   it('incrementa version y mantiene updated_at en cada UPDATE', async () => {
-    const { clientId } = await seedEvent();
+    const { clientId } = await seedProject();
     await client.query(`UPDATE clients SET notes = 'nota' WHERE id = $1`, [clientId]);
     await client.query(`UPDATE clients SET notes = 'otra' WHERE id = $1`, [clientId]);
     const { rows } = await client.query<{ version: number; ok: boolean }>(
@@ -178,40 +193,40 @@ describe('clientes y eventos', () => {
 });
 
 describe('documentos TDR', () => {
-  const insertDocument = (eventId: string, overrides: { key?: string; mime?: string; sha256?: string }) =>
+  const insertDocument = (projectId: string, overrides: { key?: string; mime?: string; sha256?: string }) =>
     failureCode(
-      `INSERT INTO tdr_documents (event_id, storage_provider, storage_key, original_filename, mime_type, size_bytes, sha256)
+      `INSERT INTO tdr_documents (project_id, storage_provider, storage_key, original_filename, mime_type, size_bytes, sha256)
        VALUES ($1, 'local', $2, 'x.pdf', $3, 100, $4)`,
-      [eventId, overrides.key ?? `tdr/${randomUUID()}.pdf`, overrides.mime ?? 'application/pdf', overrides.sha256 ?? sha('c')],
+      [projectId, overrides.key ?? `tdr/${randomUUID()}.pdf`, overrides.mime ?? 'application/pdf', overrides.sha256 ?? sha('c')],
     );
 
   it('rechaza tipos distintos de PDF y hash mal formado', async () => {
-    const { eventId } = await seedEvent();
-    expect(await insertDocument(eventId, { mime: 'application/msword' })).toBe(PgErrorCode.checkViolation);
-    expect(await insertDocument(eventId, { sha256: 'ABC' })).toBe(PgErrorCode.checkViolation);
-    expect(await insertDocument(eventId, { sha256: 'A'.repeat(64) })).toBe(PgErrorCode.checkViolation);
+    const { projectId } = await seedProject();
+    expect(await insertDocument(projectId, { mime: 'application/msword' })).toBe(PgErrorCode.checkViolation);
+    expect(await insertDocument(projectId, { sha256: 'ABC' })).toBe(PgErrorCode.checkViolation);
+    expect(await insertDocument(projectId, { sha256: 'A'.repeat(64) })).toBe(PgErrorCode.checkViolation);
   });
 
   it.each(['../secreto.pdf', 'tdr/../../x.pdf', '/etc/x.pdf', 'C:/datos/x.pdf', 'tdr\\x.pdf', '  '])(
     'rechaza la clave de almacenamiento insegura %j',
     async (key) => {
-      const { eventId } = await seedEvent();
-      expect(await insertDocument(eventId, { key })).toBe(PgErrorCode.checkViolation);
+      const { projectId } = await seedProject();
+      expect(await insertDocument(projectId, { key })).toBe(PgErrorCode.checkViolation);
     },
   );
 
-  it('rechaza el mismo PDF dos veces en el mismo evento', async () => {
-    const { eventId } = await seedEvent();
-    await seedDocument(eventId, 'a');
-    expect(await insertDocument(eventId, { sha256: sha('a') })).toBe(PgErrorCode.uniqueViolation);
+  it('rechaza el mismo PDF dos veces en el mismo proyecto', async () => {
+    const { projectId } = await seedProject();
+    await seedDocument(projectId, 'a');
+    expect(await insertDocument(projectId, { sha256: sha('a') })).toBe(PgErrorCode.uniqueViolation);
   });
 });
 
 describe('extracciones', () => {
   it('permite un solo procesamiento activo por documento y claves de idempotencia únicas', async () => {
-    const { eventId } = await seedEvent();
-    const documentId = await seedDocument(eventId);
-    const otherDocumentId = await seedDocument(eventId, 'b');
+    const { projectId } = await seedProject();
+    const documentId = await seedDocument(projectId);
+    const otherDocumentId = await seedDocument(projectId, 'b');
     const key = randomUUID();
     await client.query(
       `INSERT INTO tdr_extractions (tdr_document_id, idempotency_key, provider, model, prompt_version, schema_version)
@@ -225,8 +240,8 @@ describe('extracciones', () => {
   });
 
   it('acepta cualquier proveedor en minúsculas y rechaza formatos inválidos', async () => {
-    const { eventId } = await seedEvent();
-    const documentId = await seedDocument(eventId);
+    const { projectId } = await seedProject();
+    const documentId = await seedDocument(projectId);
     const insert = (provider: string) =>
       failureCode(
         `INSERT INTO tdr_extractions (tdr_document_id, idempotency_key, provider, model, prompt_version, schema_version, status, error_code)
@@ -240,8 +255,8 @@ describe('extracciones', () => {
   });
 
   it('exige coherencia entre estado y datos', async () => {
-    const { eventId } = await seedEvent();
-    const extractionId = await seedExtraction(await seedDocument(eventId));
+    const { projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId));
     expect(await failureCode(`UPDATE tdr_extractions SET status = 'failed' WHERE id = $1`, [extractionId])).toBe(
       PgErrorCode.checkViolation,
     );
@@ -254,9 +269,9 @@ describe('extracciones', () => {
   });
 
   it('conserva raw_response inmutable y no cambia de documento', async () => {
-    const { eventId } = await seedEvent();
-    const extractionId = await seedExtraction(await seedDocument(eventId), 'processed');
-    const otherDocumentId = await seedDocument(eventId, 'b');
+    const { projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId), 'processed');
+    const otherDocumentId = await seedDocument(projectId, 'b');
     expect(await failureCode(`UPDATE tdr_extractions SET raw_response = '{"items":[]}' WHERE id = $1`, [extractionId])).toBe(
       PgErrorCode.checkViolation,
     );
@@ -266,8 +281,8 @@ describe('extracciones', () => {
   });
 
   it('reprocesa sin perder la confirmación y exige un reemplazo explícito', async () => {
-    const { eventId } = await seedEvent();
-    const documentId = await seedDocument(eventId);
+    const { projectId } = await seedProject();
+    const documentId = await seedDocument(projectId);
     const first = await seedExtraction(documentId, 'processed');
     await client.query(`UPDATE tdr_extractions SET status = 'confirmed', confirmed_at = now() WHERE id = $1`, [first]);
 
@@ -291,21 +306,21 @@ describe('extracciones', () => {
 
 describe('ítems del desglose', () => {
   it('solo permite ítems mientras la extracción está en processed', async () => {
-    const { eventId } = await seedEvent();
-    const pending = await seedExtraction(await seedDocument(eventId));
+    const { projectId } = await seedProject();
+    const pending = await seedExtraction(await seedDocument(projectId));
     expect(
-      await failureCode(`INSERT INTO tdr_items (extraction_id, item_number, producto, subproducto, descripcion, source)
-         VALUES ($1, 1, 'P', 'S', 'D', 'manual')`, [pending]),
+      await failureCode(`INSERT INTO tdr_items (extraction_id, item_number, rubro, producto, subproducto, descripcion, source)
+         VALUES ($1, 1, 'R', 'P', 'S', 'D', 'manual')`, [pending]),
     ).toBe(PgErrorCode.checkViolation);
   });
 
   it('valida cantidades, días y origen de la fila', async () => {
-    const { eventId } = await seedEvent();
-    const extractionId = await seedExtraction(await seedDocument(eventId), 'processed');
+    const { projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId), 'processed');
     const insert = (values: string) =>
       failureCode(
-        `INSERT INTO tdr_items (extraction_id, item_number, producto, subproducto, descripcion, cant, dias, source, source_index)
-         VALUES ($1, ${values})`,
+        `INSERT INTO tdr_items (extraction_id, rubro, item_number, producto, subproducto, descripcion, cant, dias, source, source_index)
+         VALUES ($1, 'R', ${values})`,
         [extractionId],
       );
     expect(await insert(`1, 'P', 'S', 'D', NULL, NULL, 'ai', 0`)).toBeUndefined();
@@ -321,8 +336,8 @@ describe('ítems del desglose', () => {
   });
 
   it('permite renumerar filas dentro de la transacción y rechaza duplicados al validar', async () => {
-    const { eventId } = await seedEvent();
-    const extractionId = await seedExtraction(await seedDocument(eventId), 'processed');
+    const { projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId), 'processed');
     const first = await seedItem(extractionId, 1);
     const second = await seedItem(extractionId, 2);
     await client.query(`UPDATE tdr_items SET item_number = CASE WHEN id = $1 THEN 2 ELSE 1 END WHERE id IN ($1, $2)`, [first, second]);
@@ -334,8 +349,8 @@ describe('ítems del desglose', () => {
   });
 
   it('bloquea los ítems de una extracción confirmada', async () => {
-    const { eventId } = await seedEvent();
-    const extractionId = await seedExtraction(await seedDocument(eventId), 'processed');
+    const { projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId), 'processed');
     const itemId = await seedItem(extractionId, 1, 'ai');
     await client.query(`UPDATE tdr_items SET descripcion = 'Editada por el usuario' WHERE id = $1`, [itemId]);
     await client.query(`UPDATE tdr_extractions SET status = 'confirmed', confirmed_at = now() WHERE id = $1`, [extractionId]);
@@ -343,8 +358,8 @@ describe('ítems del desglose', () => {
     expect(await failureCode(`UPDATE tdr_items SET cant = 9 WHERE id = $1`, [itemId])).toBe(PgErrorCode.checkViolation);
     expect(await failureCode(`DELETE FROM tdr_items WHERE id = $1`, [itemId])).toBe(PgErrorCode.checkViolation);
     expect(
-      await failureCode(`INSERT INTO tdr_items (extraction_id, item_number, producto, subproducto, descripcion, source)
-         VALUES ($1, 2, 'P', 'S', 'D', 'manual')`, [extractionId]),
+      await failureCode(`INSERT INTO tdr_items (extraction_id, item_number, rubro, producto, subproducto, descripcion, source)
+         VALUES ($1, 2, 'R', 'P', 'S', 'D', 'manual')`, [extractionId]),
     ).toBe(PgErrorCode.checkViolation);
 
     const { rows } = await client.query<{ descripcion: string; version: number }>(
@@ -352,5 +367,120 @@ describe('ítems del desglose', () => {
       [itemId],
     );
     expect(rows[0]).toEqual({ descripcion: 'Editada por el usuario', version: 2 });
+  });
+});
+
+describe('ficha del proyecto y empresa', () => {
+  it('valida monto, moneda y sedes', async () => {
+    const { clientId } = await seedProject();
+    const insert = (columns: string, values: string) =>
+      failureCode(`INSERT INTO projects (client_id, name, ${columns}) VALUES ($1, 'X', ${values})`, [clientId]);
+    expect(await insert('contract_amount, currency, venues', `286400.50, 'USD', '{Guayaquil,Quito}'`)).toBeUndefined();
+    expect(await insert('contract_amount', '10')).toBe(PgErrorCode.checkViolation);
+    expect(await insert('contract_amount, currency', `-1, 'USD'`)).toBe(PgErrorCode.checkViolation);
+    expect(await insert('currency', `'usd'`)).toBe(PgErrorCode.checkViolation);
+    expect(await insert('venues', `'{""}'`)).toBe(PgErrorCode.checkViolation);
+    expect(await insert('venues', `ARRAY[NULL]::text[]`)).toBe(PgErrorCode.checkViolation);
+    expect(await insert('process_code', `'  '`)).toBe(PgErrorCode.checkViolation);
+  });
+
+  it('devuelve las sedes como arreglo y el monto como texto exacto', async () => {
+    const { clientId } = await seedProject();
+    const { rows } = await client.query<{ venues: unknown; contract_amount: unknown }>(
+      `INSERT INTO projects (client_id, name, contract_amount, currency, venues)
+       VALUES ($1, 'X', 1000.5, 'USD', '{Quito,Cuenca}') RETURNING venues, contract_amount`,
+      [clientId],
+    );
+    expect(rows[0]).toEqual({ venues: ['Quito', 'Cuenca'], contract_amount: '1000.50' });
+  });
+
+  it('solo acepta la ficha de una extracción del mismo proyecto', async () => {
+    const { clientId, projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId), 'processed');
+    await client.query(`UPDATE projects SET ficha_extraction_id = $2 WHERE id = $1`, [projectId, extractionId]);
+    const other = await insertId(`INSERT INTO projects (client_id, name) VALUES ($1, 'Otro') RETURNING id`, [clientId]);
+    expect(await failureCode(`UPDATE projects SET ficha_extraction_id = $2 WHERE id = $1`, [other, extractionId])).toBe(
+      PgErrorCode.checkViolation,
+    );
+  });
+
+  it('vincula opcionalmente una empresa y no permite borrarla si tiene proyectos', async () => {
+    const { projectId } = await seedProject();
+    const companyId = await insertId(`INSERT INTO companies (name, tax_id) VALUES ('Empresa sintética', '0990000000001') RETURNING id`, []);
+    await client.query(`UPDATE projects SET company_id = $2 WHERE id = $1`, [projectId, companyId]);
+    expect(await failureCode(`DELETE FROM companies WHERE id = $1`, [companyId])).toBe(PgErrorCode.restrictViolation);
+    expect(await failureCode(`INSERT INTO companies (name, tax_id) VALUES ('Otra', '0990000000001')`)).toBe(PgErrorCode.uniqueViolation);
+  });
+});
+
+describe('trabajadores y responsables', () => {
+  async function seedWorker(active = true): Promise<string> {
+    return insertId(`INSERT INTO workers (full_name, active) VALUES ('Trabajador sintético', $1) RETURNING id`, [active]);
+  }
+
+  it('rechaza nombres vacíos', async () => {
+    expect(await failureCode(`INSERT INTO workers (full_name) VALUES ('  ')`)).toBe(PgErrorCode.checkViolation);
+  });
+
+  it('acepta subproducto nulo y exige rubro', async () => {
+    const { projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId), 'processed');
+    const insert = (rubro: string | null, subproducto: string | null) =>
+      failureCode(
+        `INSERT INTO tdr_items (extraction_id, item_number, rubro, producto, subproducto, descripcion, source)
+         VALUES ($1, 1, $2, 'P', $3, 'D', 'manual')`,
+        [extractionId, rubro, subproducto],
+      );
+    expect(await insert('R', null)).toBeUndefined();
+    await client.query(`DELETE FROM tdr_items WHERE extraction_id = $1`, [extractionId]);
+    expect(await insert(null, 'S')).toBe('23502');
+    expect(await insert(' ', 'S')).toBe(PgErrorCode.checkViolation);
+    expect(await insert('R', ' ')).toBe(PgErrorCode.checkViolation);
+  });
+
+  it('asigna un solo responsable por ítem, solo trabajadores activos', async () => {
+    const { projectId } = await seedProject();
+    const itemId = await seedItem(await seedExtraction(await seedDocument(projectId), 'processed'), 1);
+    const inactive = await seedWorker(false);
+    expect(await failureCode(`INSERT INTO tdr_item_assignments (tdr_item_id, worker_id) VALUES ($1, $2)`, [itemId, inactive])).toBe(
+      PgErrorCode.checkViolation,
+    );
+    expect(
+      await failureCode(`INSERT INTO tdr_item_assignments (tdr_item_id, worker_id) VALUES ($1, $2)`, [itemId, randomUUID()]),
+    ).toBe(PgErrorCode.foreignKeyViolation);
+    const worker = await seedWorker();
+    await client.query(`INSERT INTO tdr_item_assignments (tdr_item_id, worker_id) VALUES ($1, $2)`, [itemId, worker]);
+    expect(await failureCode(`INSERT INTO tdr_item_assignments (tdr_item_id, worker_id) VALUES ($1, $2)`, [itemId, worker])).toBe(
+      PgErrorCode.uniqueViolation,
+    );
+  });
+
+  it('permite cambiar el responsable después de confirmar la extracción', async () => {
+    const { projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId), 'processed');
+    const itemId = await seedItem(extractionId, 1);
+    const first = await seedWorker();
+    const second = await seedWorker();
+    await client.query(`INSERT INTO tdr_item_assignments (tdr_item_id, worker_id) VALUES ($1, $2)`, [itemId, first]);
+    await client.query(`UPDATE tdr_extractions SET status = 'confirmed', confirmed_at = now() WHERE id = $1`, [extractionId]);
+
+    // Desactivar al trabajador no borra su asignación previa.
+    await client.query(`UPDATE workers SET active = false WHERE id = $1`, [first]);
+    await client.query(`UPDATE tdr_item_assignments SET updated_at = now() WHERE tdr_item_id = $1`, [itemId]);
+    await client.query(`UPDATE tdr_item_assignments SET worker_id = $2 WHERE tdr_item_id = $1`, [itemId, second]);
+    const { rows } = await client.query<{ worker_id: string; version: number }>(
+      `SELECT worker_id, version FROM tdr_item_assignments WHERE tdr_item_id = $1`,
+      [itemId],
+    );
+    expect(rows[0]).toEqual({ worker_id: second, version: 3 });
+  });
+
+  it('no permite borrar un ítem con responsable ni un trabajador asignado', async () => {
+    const { projectId } = await seedProject();
+    const itemId = await seedItem(await seedExtraction(await seedDocument(projectId), 'processed'), 1);
+    const worker = await seedWorker();
+    await client.query(`INSERT INTO tdr_item_assignments (tdr_item_id, worker_id) VALUES ($1, $2)`, [itemId, worker]);
+    expect(await failureCode(`DELETE FROM tdr_items WHERE id = $1`, [itemId])).toBe(PgErrorCode.restrictViolation);
+    expect(await failureCode(`DELETE FROM workers WHERE id = $1`, [worker])).toBe(PgErrorCode.restrictViolation);
   });
 });

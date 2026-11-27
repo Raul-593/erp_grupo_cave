@@ -4,149 +4,220 @@
 
 | Tarea | Estado |
 | --- | --- |
-| Fase 1 · 1.0b — Interfaz web base (Next.js) con clientes y eventos | **Aprobado; en progreso** — dependencias instaladas y compatibles; código no iniciado por indicación del usuario |
+| Fase 1 · Módulo Operación › Requerimiento con el diseño del prototipo `CAVE-ERP-v3` (reemplaza el plan visual 1.0b; abarca 1.0b, 1.2, 1.3 y 1.4) | **Aprobado; en progreso** — etapas A y B completadas; C preparada sin proveedor (falta SDK y adaptador); D sin iniciar |
+| Actualización de `AGENTS.md`: terminología proyecto/empresa, guía visual, ficha del proyecto, rubros y responsable por ítem | Completado (2026-11-26, solicitado por el usuario) |
+| Fase 1 · 1.0b — Interfaz web base (Next.js) | **Reemplazado** por la tarea anterior; se conservan la instalación y las decisiones técnicas V-D1–V-D9 |
 | Fase 1 · 1.1 — Conexión a PostgreSQL y creación de tablas | Completado (2026-11-26) |
 | Actualización de `AGENTS.md`: IA multiproveedor con conexión común | Completado (2026-11-26, solicitado por el usuario) |
 
 ---
 
-## Tarea actual: Fase 1 · 1.0b — Interfaz web base con clientes y eventos
+## Tarea actual: Fase 1 · Operación › Requerimiento
 
 | Campo | Valor |
 | --- | --- |
-| Estado | **Propuesto** — pendiente de aprobación del plan y, por separado, de cada instalación (§V4) |
+| Estado | **Aprobado por el usuario (2026-11-26) — en progreso.** Etapas A y B completadas; la carga se verificó con el TDR real del usuario. Sigue pendiente R-D6 (proveedor de IA) y la instalación de su SDK (R5), necesarias en la etapa C |
 | Fecha | 2026-11-26 |
-| Fase | Cierre de 1.0 (frontend y estructura) y primera parte visible del flujo de Fase 1 |
-| Fuera de alcance | Carga y almacenamiento de PDF (1.2), llamadas a IA (1.3), guardar el desglose (1.4), autenticación, despliegue en Netlify |
+| Fase | Fase 1 completa, organizada en cuatro etapas con revisión entre cada una |
+| Referencia visual | Prototipo `CAVE-ERP-v3.html` entregado por el usuario (fuera del repositorio). Se copia su diseño, no sus datos |
+| Fuera de alcance | Resto de módulos del prototipo, selector e interfaz de empresas, cotizaciones, comparativo, versiones/adendas, exportar a Excel, precios, tareas y seguimiento de responsables, autenticación, despliegue |
 
-### V1. Objetivo
+### R1. Objetivo
 
-Tener una aplicación web local en español donde se puedan **registrar, listar y editar clientes y eventos** guardados en PostgreSQL (`erp`), ver el **detalle de un evento** con su sección de documentos TDR, y revisar la **tabla editable de ocho columnas** como componente terminado, para validar el diseño antes de conectarla a la IA.
+En el módulo **Operación › Requerimiento**, con el aspecto del prototipo, poder: elegir o crear un proyecto, **subir el PDF del TDR**, pulsar «Procesar TDR con IA» y obtener del documento **la ficha del proyecto y la matriz de entregables completa**; revisar y corregir todo, **asignar un responsable por ítem** con una lista desplegable de trabajadores, y confirmar el resultado en PostgreSQL.
 
-### V2. Pantallas propuestas
+### R2. Decisiones ya tomadas por el usuario (2026-11-26)
+
+| Tema | Decisión |
+| --- | --- |
+| Responsable | **Un solo responsable por ítem**, elegido de una **lista desplegable** con los nombres de los trabajadores |
+| Niveles de la matriz | **Tres niveles**: rubro › producto › subproducto, con numeración 1.1, 1.2… por rubro |
+| Proyecto y empresa | Se usa «Proyecto» y «Empresa». La empresa **no se implementa todavía en la interfaz**; la migración la deja preparada |
+| Ficha del proyecto | La IA la extrae del PDF, **incluido el monto** (transcrito del TDR, no estimado) |
+
+`AGENTS.md` ya refleja estas decisiones (§1 terminología, §2 alcance, §6 guía visual, §7 modelo, §8 contrato, §12 hoja de ruta).
+
+### R3. Pantallas
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│ Grupo Cave · ERP                       Eventos   Clientes            │
-├──────────────────────────────────────────────────────────────────────┤
-│ Eventos                                            [ + Nuevo evento ]│
-│ Buscar… [_____________]   Cliente: [Todos ▾]                         │
-│ ┌────────────────────┬──────────────┬────────────┬─────────┬───────┐ │
-│ │ Evento             │ Cliente      │ Fechas     │ Lugar   │ TDR   │ │
-│ ├────────────────────┼──────────────┼────────────┼─────────┼───────┤ │
-│ │ …                  │ …            │ 01–03 dic  │ …       │ 0     │ │
-│ └────────────────────┴──────────────┴────────────┴─────────┴───────┘ │
-└──────────────────────────────────────────────────────────────────────┘
-
-Detalle del evento
-┌──────────────────────────────────────────────────────────────────────┐
-│ ← Eventos   Evento X · Cliente Y · 01–03 dic 2026        [ Editar ]  │
-│ Documentos TDR                                                       │
-│  ┌ Zona de carga de PDF (deshabilitada: "Disponible en la 1.2") ┐    │
-│  Lista de documentos y estado de su extracción (vacía por ahora)     │
-│  [ Procesar TDR con IA ]  (deshabilitado hasta la 1.3)               │
-└──────────────────────────────────────────────────────────────────────┘
-
-Tabla editable (componente para la 1.4)
-┌────┬──────────┬─────────────┬──────────────┬──────┬────────┬──────┬─────────────┬───┐
-│ #  │ Producto │ Subproducto │ Descripción  │ Cant │ Unidad │ Días │ Observación │ ✕ │
-├────┼──────────┼─────────────┼──────────────┼──────┼────────┼──────┼─────────────┼───┤
-│ 1  │ [      ] │ [         ] │ [          ] │ [  ] │ [    ] │ [  ] │ [         ] │ 🗑 │
-└────┴──────────┴─────────────┴──────────────┴──────┴────────┴──────┴─────────────┴───┘
-[ + Agregar fila ]   Cambios sin guardar: 2          [ Descartar ] [ Confirmar ]
+┌────────────┬───────────────────────────────────────────────────────────────────────┐
+│ ■ CAVE ERP │ Proyecto: [Proyecto seleccionado ▾]                          ☀  ☾      │
+│            ├───────────────────────────────────────────────────────────────────────┤
+│ GESTIÓN    │ PROYECTOS   REQUERIMIENTO   TRABAJADORES                              │
+│▌OPERACIÓN  ├───────────────────────────────────────────────────────────────────────┤
+│            │ REQUERIMIENTO                         [ + Ítem ] [ CARGAR TDR ]       │
+│            │ Aquí entra el TDR y queda convertido en la matriz de entregables.     │
+│            │ ┌ DOCUMENTO TDR ───────────────────────────────────────────────────┐  │
+│            │ │ tdr.pdf · 2,4 MB · 48 págs.   [PROCESADO]   [ Procesar con IA ]  │  │
+│            │ └──────────────────────────────────────────────────────────────────┘  │
+│            │ ┌ FICHA DEL PROYECTO ───────────────── ◆ Propuesta IA [Aplicar] ───┐  │
+│            │ │ CONTRATANTE │ PROCESO │ OBJETO │ MONTO │ SEDES │ PLAZO │ ADMIN.  │  │
+│            │ └──────────────────────────────────────────────────────────────────┘  │
+│            │ ┌ MATRIZ DE ENTREGABLES ───────────────────────────────────────────┐  │
+│            │ │ ÍTEM│PRODUCTO  │SUBPROD.│DESCRIPCIÓN│CANT│UNID│DÍAS│OBS.│RESPONS.│  │
+│            │ │ 1 · ESCENARIO Y ESTRUCTURAS (rubro, editable)                    │  │
+│            │ │ 1.1 │[       ] │[     ] │[        ] │[ ] │[  ]│[ ] │[  ]│[ ▾ ]  ✕│  │
+│            │ │ 2 · AUDIO, LUCES Y VIDEO                                         │  │
+│            │ │ 2.1 │ …                                                          │  │
+│            │ │ 52 ítems en 6 rubros · 3 sin responsable · cambios sin guardar: 2│  │
+│            │ │                         [ Descartar ] [ Guardar ] [ CONFIRMAR ]  │  │
+│            │ └──────────────────────────────────────────────────────────────────┘  │
+└────────────┴───────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Eventos** (pantalla inicial): lista con búsqueda y filtro por cliente; crear y editar.
-- **Clientes**: lista; crear y editar (nombre obligatorio; RUC/cédula, correo, teléfono y notas opcionales, como en la tabla `clients`).
-- **Detalle del evento**: datos del evento y sección «Documentos TDR». La carga de PDF y el botón «Procesar TDR con IA» aparecen **deshabilitados y rotulados** con la subfase en que se activan; no simulan funcionamiento.
-- **Tabla editable**: editar celdas, agregar, eliminar y renumerar filas, validar cantidades y días (números ≥ 0 o vacío = desconocido), avisar de cambios sin guardar. En esta tarea solo funciona en memoria, en una página de desarrollo `/desarrollo/tabla` con filas **sintéticas rotuladas como ejemplo** (no provienen de ningún TDR). La página solo existe en modo desarrollo. Se conectará a `tdr_items` en la 1.4.
-- Fechas en formato local y zona `America/Guayaquil`. Mensajes de error controlados (por ejemplo, RUC duplicado, cliente con eventos que no se puede borrar), sin detalles internos.
-- Sin borrado de clientes ni eventos en esta tarea (las claves foráneas usan `RESTRICT`; el archivado se diseñará aparte).
+- **Estructura y estilo** según `AGENTS.md` §6 «Guía visual»: barra lateral oscura, barra superior con selector de proyecto, pestañas en mayúsculas, tarjetas, etiquetas de estado de color, modo claro/oscuro.
+- **Proyectos:** lista y alta/edición mínima (nombre, contratante, fechas, sedes). El contratante puede crearse desde el mismo formulario.
+- **Requerimiento:** sin TDR muestra un estado vacío con la zona de carga; con TDR muestra el documento y su estado (Pendiente, Procesando, Procesado, Error, Confirmado, Reemplazado), la ficha y la matriz.
+- **Ficha del proyecto:** cuadrícula etiqueta/valor como en el prototipo, editable. Los valores que propone la IA se muestran en violeta con «Propuesta IA» y se aplican al proyecto solo al pulsar «Aplicar» (campo por campo o todos). El contratante extraído se vincula a uno existente (por RUC o nombre) o se crea tras confirmarlo.
+- **Matriz de entregables:** agrupada por rubro; columna Ítem con 1.1, 1.2… calculada; Producto con el rubro debajo en texto secundario (como el prototipo) en modo lectura y campos editables en modo edición; **Responsable** como lista desplegable de trabajadores activos (un trabajador desactivado sigue visible si ya estaba asignado). Agregar, eliminar, mover entre rubros y renumerar. Validación: cant. y días numéricos ≥ 0 o vacío (= desconocido); producto y descripción obligatorios; aviso de cambios sin guardar. Tras confirmar, la matriz queda bloqueada pero **el responsable se puede seguir cambiando**.
+- **Trabajadores:** lista, alta, edición y desactivación (nombre completo obligatorio; cargo, teléfono y correo opcionales). No se borran trabajadores con asignaciones.
+- No se muestran los demás módulos ni las tarjetas de cotizaciones/comparativo/adendas del prototipo. No se cargan como datos los nombres ni montos del prototipo.
 
-### V3. Decisiones pendientes de aprobación (con recomendación)
+### R4. Decisiones pendientes de aprobación (con recomendación)
+
+Se mantienen las decisiones V-D1 (Next.js 16 + React 19), V-D2 (backend en el servidor de Next.js para operaciones cortas), V-D3 (Tailwind 4 + componentes propios), V-D4 (capas), V-D5 (zod), V-D6 (TanStack Table), V-D8 (sin autenticación, solo `127.0.0.1`) y V-D9 (lint, typecheck, vitest, build) del plan 1.0b, ya aprobado. Cambian o se añaden:
 
 | ID | Decisión | Recomendación | Alternativas y motivo |
 | --- | --- | --- | --- |
-| V-D1 | Framework | **Next.js 16 (App Router) + React 19** en `apps/web` | Decisión ya prevista en `AGENTS.md`. Renderizado en servidor: las credenciales de la base nunca llegan al navegador. |
-| V-D2 | Dónde corre el backend de esta tarea | **En el servidor de Next.js** (Server Components y Server Actions) para operaciones cortas de clientes y eventos | Suficiente para CRUD. El procesamiento de PDF extensos con IA (1.3) puede superar los límites de las funciones de Netlify (las síncronas tienen un límite de segundos y de tamaño de carga; las *background functions* llegan a unos minutos; **valores a verificar en la documentación vigente**). Se decidirá en la 1.3 si se necesita un trabajador o backend separado; la separación por capas (V-D4) lo permite sin reescribir. |
-| V-D3 | Estilos y componentes | **Tailwind CSS 4 + componentes propios** sencillos (botón, campo, tabla, diálogo nativo `<dialog>`) | Pocas dependencias y control total del diseño. **shadcn/ui** (Radix): componentes accesibles listos, pero añade 5–8 paquetes más; puede incorporarse después. **MUI/Mantine**: bibliotecas completas con más peso y estilo propio difícil de adaptar. |
-| V-D4 | Capas | Repositorios SQL en `packages/db/src/repositories`; servicios y validación en `apps/web/src/server`; componentes en `apps/web/src/components`; páginas en `apps/web/src/app` | Cumple la separación de `AGENTS.md` §6. Las páginas nunca escriben SQL. |
-| V-D5 | Validación | **zod**, en el servidor, para formularios (y luego para validar el JSON de la IA en 1.3) | Una sola herramienta para ambos usos; esquemas tipados. Alternativa: validación manual (más código y menos coherente). |
-| V-D6 | Tabla editable | **TanStack Table** (sin estilos, ~1 paquete) | Columnas, orden y futuras funciones (ordenar, virtualizar filas largas) sin imponer diseño. **AG Grid Community**: hoja de cálculo completa pero pesada y con estilo propio. Tabla hecha a mano: viable, pero habría que reimplementar lo anterior. |
-| V-D7 | Tabla en esta tarea | Construirla ya, con datos sintéticos rotulados en `/desarrollo/tabla` | Permite revisar la pantalla más importante antes de la IA. Alternativa: dejarla para la 1.4. |
-| V-D8 | Autenticación | **Sin autenticación**, solo local: servidor en `127.0.0.1`, datos sintéticos o autorizados | Permitido por `AGENTS.md` §10 únicamente si lo apruebas. La autenticación es obligatoria antes de cualquier exposición externa (Fase 3 o antes). |
-| V-D9 | Calidad | ESLint con la configuración de Next.js; `pnpm lint`, `pnpm typecheck`, `pnpm build` y pruebas con vitest | `AGENTS.md` §4 exige lint y build al finalizar. |
-| V-D10 | Tipografía | Fuentes del sistema (sin `next/font` con Google Fonts) | Evita descargas externas en el build y en el navegador. |
+| R-D1 | Tipografía (sustituye V-D10) | **Inter con `next/font/google`**: Next.js descarga la fuente al compilar y la sirve desde la propia aplicación; el navegador no contacta a Google. No requiere instalar paquetes | Fuentes del sistema (V-D10): sin descarga, pero se pierde el aspecto del prototipo. El build necesitará internet la primera vez |
+| R-D2 | Migración `0006` | **Una migración nueva** (no se editan las aplicadas): renombrar `events` → `projects` y `tdr_documents.event_id` → `project_id` (con sus restricciones, índices y triggers); añadir a `projects` las columnas de la ficha; crear `companies`, `workers` y `tdr_item_assignments`; añadir `tdr_items.rubro` y permitir `subproducto` nulo. Detalle en R4.1 | Mantener `events` y solo añadir columnas: menos cambios, pero el código y la base hablarían de «eventos» y la interfaz de «proyectos». Renombrar ahora es seguro: las tablas están vacías y `ALTER … RENAME` no borra datos |
+| R-D3 | Dónde vive la ficha | **Columnas de `projects`**, editables en cualquier momento con control de versión; la propuesta de la IA queda en `raw_response.ficha` (inmutable) y `projects.ficha_extraction_id` registra de qué extracción se aplicó | Tabla aparte de borradores de ficha: más trazabilidad, más complejidad sin necesidad actual |
+| R-D4 | Responsable | Tabla **`tdr_item_assignments`** (un registro por ítem, clave = ítem) con `worker_id` → `workers` (`RESTRICT`) | Columna en `tdr_items`: imposible, porque los ítems confirmados son inmutables y el responsable debe poder cambiar. Al reprocesar, el nuevo intento empieza sin responsables (copiar responsables queda como mejora) |
+| R-D5 | Gestión de trabajadores | **Pestaña mínima «Trabajadores»** en Operación | Solo alta desde la lista desplegable: más rápido, pero sin forma de editar ni desactivar |
+| R-D6 | Primer adaptador de IA | **A elegir por ti**: Anthropic (`@anthropic-ai/sdk`; `.env.example` ya tiene líneas `CLAUDE_*`), OpenAI (`openai`) o Google (`@google/genai`). Antes de integrarlo verificaré en la documentación vigente la entrada PDF nativa, la salida estructurada y los límites de tamaño | La interfaz común permite añadir los demás después sin tocar dominio ni persistencia (`AGENTS.md` §8). Requiere tu clave en `.env` (la escribes tú) y tu autorización para enviar TDR reales; si no, solo PDF sintéticos |
+| R-D7 | Ejecución del procesamiento | **En el proceso del servidor local**: «Procesar» crea la extracción `pending` con clave de idempotencia, la procesa en segundo plano dentro del servidor y la pantalla consulta el estado cada pocos segundos. Tiempo máximo configurable; un intento que quede en `processing` tras reiniciar el servidor se marca como error al detectarlo | Trabajador separado o cola persistente: más robusto, innecesario en local. Antes de desplegar en Netlify se reevalúa (V-D2) |
+| R-D8 | Carga del PDF | **Route Handler** `POST` con `multipart/form-data`; límite 50 MB (`TDR_MAX_BYTES`); valida extensión, tipo y firma `%PDF-`; SHA-256 para detectar duplicados; almacenamiento local en `STORAGE_LOCAL_DIR` (por defecto `storage/`, ya excluido de Git) con clave `tdr/<proyecto>/<uuid>.pdf`; si falla la base se borra el archivo | Server Action: su límite de tamaño por defecto es bajo y el progreso de carga es peor. Sin librería para contar páginas (`page_count` queda nulo) |
+| R-D9 | Selector superior | Solo **«Proyecto»**; el de «Empresa» aparece cuando se implemente `companies` | — |
 
-### V4. Instalaciones (requieren tu aprobación antes de ejecutarse)
+#### R4.1. Contenido propuesto de la migración `0006_proyectos_trabajadores.sql`
 
-Todas en `apps/web`. Se instalará la versión estable vigente al aprobar e informaré las versiones exactas.
+- `events` → `projects`; `tdr_documents.event_id` → `project_id`; renombrar restricciones, índices y triggers con el nuevo prefijo.
+- `projects`: `company_id uuid NULL` → `companies` (`RESTRICT`; nulo hasta que exista la interfaz de empresas), `process_code`, `purpose` (objeto), `contract_amount numeric(14,2) CHECK >= 0`, `currency char(3)` (ISO 4217, `CHECK` de formato), `amount_includes_vat boolean`, `venues text[]` (sedes), `term_text` (plazo literal), `contract_administrator`, `ficha_extraction_id uuid NULL` → `tdr_extractions`. Se conservan `location`, `start_date`, `end_date` y `notes`.
+- `companies`: `name` (no vacío), `legal_name`, `tax_id` (único si no es nulo), `active`, `created_at`, `updated_at`, `version`.
+- `workers`: `full_name` (no vacío), `job_title`, `phone`, `email`, `active`, `notes`, metadatos de fila.
+- `tdr_item_assignments`: `tdr_item_id` (PK, → `tdr_items` `RESTRICT`), `worker_id` (→ `workers` `RESTRICT`, índice), metadatos de fila.
+- `tdr_items`: `rubro text NOT NULL` (no vacío); `subproducto` admite `NULL` (no vacío si se informa).
+- La sección *down* existe pero contiene `DROP`/renombres inversos: no se ejecuta sin tu autorización expresa.
+- Se valida primero en un esquema temporal dentro de una transacción revertida (como en 1.1), después en `erp_test` y por último en `erp`.
 
-| Paquete | Tipo | Para qué |
-| --- | --- | --- |
-| `next` | producción | Framework web (servidor y enrutamiento) |
-| `react`, `react-dom` | producción | Interfaz de usuario |
-| `zod` | producción | Validación de datos en el servidor |
-| `@tanstack/react-table` | producción | Lógica de la tabla editable |
-| `tailwindcss`, `@tailwindcss/postcss`, `postcss` | desarrollo | Estilos |
-| `@types/react`, `@types/react-dom` | desarrollo | Tipos de React |
-| `typescript` | desarrollo | Verificación de tipos (ver riesgo de versión en V7) |
-| `eslint`, `eslint-config-next` | desarrollo | Lint |
-| `vitest` | desarrollo | Pruebas de validación y servicios de `apps/web` |
+### R5. Instalaciones (requieren tu aprobación antes de ejecutarse)
 
-Los repositorios nuevos de `packages/db` no requieren paquetes adicionales. Pruebas de componentes en navegador (`@testing-library/react`, `jsdom`) o de extremo a extremo (Playwright) quedan para la 1.4, con aprobación aparte.
-
-### V5. Pasos ordenados
-
-| # | Paso | Responsable | Verificación |
+| Paquete | Tipo | Para qué | Cuándo |
 | --- | --- | --- | --- |
-| 1 | Aprobar este plan, las decisiones V-D1 a V-D10 y la lista de instalación | Tú | Aprobación explícita |
-| 2 | Crear `apps/web` a mano (sin `create-next-app`, para no instalar nada no aprobado): `package.json`, `next.config.ts`, `tsconfig.json`, PostCSS, ESLint | Agente | Revisión del diff |
-| 3 | Instalar solo lo aprobado | Agente | `pnpm ls` |
-| 4 | Cargar el `.env` de la raíz desde `next.config.ts` y usar `@erp/db` como paquete del workspace | Agente | `pnpm --filter web build` |
-| 5 | Repositorios de clientes, eventos y documentos (lectura) en `packages/db` con consultas parametrizadas | Agente | Pruebas en `erp_test` |
-| 6 | Servicios, esquemas zod y Server Actions de clientes y eventos | Agente | Pruebas unitarias de validación |
-| 7 | Diseño base: layout, navegación, componentes de formulario y tabla | Agente | Revisión visual |
-| 8 | Pantallas de clientes y eventos (lista, crear, editar) y detalle del evento | Agente | Flujo probado en el navegador |
-| 9 | Tabla editable y página `/desarrollo/tabla` | Agente | Editar, agregar, eliminar y renumerar filas en el navegador |
-| 10 | `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` | Agente | Todo en verde |
-| 11 | Levantar el servidor local y revisarlo contigo en el navegador integrado | Agente / Tú | Tu visto bueno |
-| 12 | Actualizar `PLAN.md` y `MEMORY.md` | Agente | Sin secretos |
+| SDK oficial del proveedor elegido en R-D6 (uno solo) | producción (`apps/web` o paquete de integración) | Adaptador de IA | Etapa C |
+
+Nada más: `next/font` viene con Next.js; la carga de archivos, el hash y la firma PDF usan Node. Si durante la implementación apareciera otra necesidad, te la consultaré antes.
+
+### R6. Etapas y pasos
+
+Al terminar cada etapa me detengo para tu revisión en el navegador integrado antes de seguir.
+
+| Etapa | # | Paso | Verificación |
+| --- | --- | --- | --- |
+| — | 0 | Aprobar este plan (R4) | Tu aprobación explícita |
+| **A. Base visual y datos** | 1 | Escribir `0006`, validarla en esquema temporal, aplicarla en `erp_test` y `erp`; actualizar `domain.ts` y las 27 pruebas existentes (`events` → `projects`, `rubro`) y añadir pruebas de las tablas nuevas | `pnpm test:db`, `pnpm db:status` |
+| | 2 | Configuración de `apps/web`: `next.config.ts` (carga del `.env` raíz, `transpilePackages: ['@erp/db']`, servidor en `127.0.0.1`), `tsconfig`, PostCSS, ESLint, `globals.css` con los tokens del prototipo | `pnpm --filter web build` |
+| | 3 | Repositorios SQL parametrizados en `packages/db/src/repositories` (contratantes, proyectos, trabajadores, documentos, extracciones, ítems, asignaciones) | Pruebas en `erp_test` |
+| | 4 | Servicios y esquemas zod en `apps/web/src/server`; Server Actions | Pruebas unitarias |
+| | 5 | Diseño base: barra lateral, barra superior con selector de proyecto, pestañas, modo oscuro, componentes (botón, campo, tarjeta, etiqueta, tabla, diálogo) | Revisión visual |
+| | 6 | Pestañas Proyectos y Trabajadores; Requerimiento con estado vacío y ficha editable | **Revisión contigo** |
+| **B. Carga de PDF (1.2)** | 7 | Interfaz de almacenamiento + adaptador local; Route Handler de carga; listado y estado del documento | Pruebas: PDF válido, no PDF, vacío, demasiado grande, duplicado, fallo de base con limpieza del archivo |
+| **C. Extracción IA (1.3)** | 8 | Instalar el SDK aprobado; interfaz común de IA, adaptador, prompt versionado `v1`, esquema JSON de ficha + ítems, validación zod, estados, idempotencia, tiempo máximo, reintentos acotados, errores en español | Pruebas con mock: respuesta válida, JSON inválido, incompleta, rechazada, vacía, timeout, doble clic |
+| | 9 | Una prueba real **solo con un PDF sintético** (o real, si autorizas al proveedor) | Tu autorización previa; informe de tokens y duración |
+| **D. Matriz editable (1.4)** | 10 | Importar `raw_response.items` a `tdr_items`; tabla agrupada por rubro con edición, alta, baja, renumeración y responsable; guardar; confirmar en una transacción; ficha con «Aplicar propuesta» | Pruebas de servicio y flujo completo en el navegador |
+| Cierre | 11 | `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`; revisión del código cliente (sin credenciales ni SQL) | Todo en verde |
+| | 12 | Actualizar `PLAN.md` y `MEMORY.md` | Sin secretos |
 
 No se realizarán commits, push ni despliegues sin tu autorización.
 
-### V6. Criterios de aceptación
+#### Archivos afectados (previstos)
 
-1. `pnpm dev` levanta la aplicación en `http://127.0.0.1:3000` (solo local).
-2. Se puede crear, listar, buscar y editar clientes y eventos; los datos se guardan en el esquema `erp` y sobreviven a reiniciar el servidor.
-3. Errores controlados y en español: nombre vacío, RUC duplicado, fecha de fin anterior a la de inicio, evento sin cliente.
-4. El detalle del evento muestra la sección de documentos con los controles de 1.2/1.3 deshabilitados y rotulados.
-5. La tabla de desarrollo permite editar las 8 columnas, agregar, eliminar y renumerar filas, y rechaza cantidades o días negativos; está rotulada como datos de ejemplo.
-6. Ninguna credencial ni consulta SQL llega al navegador (revisión del código cliente y del build).
-7. `pnpm lint`, `pnpm typecheck`, `pnpm test` y `pnpm build` sin errores.
+- `packages/db/migrations/0006_proyectos_trabajadores.sql`, `packages/db/src/domain.ts`, `packages/db/src/repositories/*`, `packages/db/tests/*`
+- `apps/web/` (configuración, `src/app`, `src/components`, `src/server`, `src/integrations/ai`, `src/integrations/storage`, `src/prompts`)
+- `.env.example` (variables `AI_PROVIDER`, `AI_MODEL`, clave del proveedor elegido, `STORAGE_LOCAL_DIR`, `TDR_MAX_BYTES`), `PLAN.md`, `MEMORY.md`
 
-### V7. Riesgos
+### R7. Criterios de aceptación
 
-- **TypeScript 7 y Next.js:** el proyecto usa TypeScript 7.0.2 (versión nativa). Next.js usa el paquete `typescript` durante el build; si no es compatible, propondré instalar en `apps/web` la última versión 5.x/6.x compatible (te lo consultaré antes).
-- **Importar `.ts` del workspace:** `@erp/db` exporta archivos `.ts` con extensión explícita; Next.js debe transpilarlos (`transpilePackages`). Se verificará en el paso 4.
-- **Límites de Netlify para la IA:** no afectan a esta tarea, pero condicionan la 1.3 (V-D2).
-- **Prototipo sin autenticación:** solo local y con datos sintéticos o autorizados.
-- **Datos de ejemplo en la tabla:** riesgo de confundirlos con una extracción real; mitigado con rótulo visible y página solo de desarrollo.
-- **pnpm 12 y scripts de instalación:** pnpm puede bloquear scripts de instalación de algunos paquetes (p. ej. binarios nativos); si alguno lo requiere, te lo consultaré.
+1. `pnpm dev` levanta la aplicación en `http://127.0.0.1:3000` con el aspecto del prototipo (barra lateral, barra superior, pestañas, tarjetas, modo claro/oscuro) y solo los módulos implementados.
+2. Se pueden crear y editar proyectos, contratantes y trabajadores; los datos se guardan en el esquema `erp`.
+3. En Requerimiento se sube un PDF; se rechazan de forma controlada los archivos no PDF, vacíos, duplicados o mayores que el límite.
+4. «Procesar TDR con IA» genera la ficha (contratante, código de proceso, objeto, monto, moneda, sedes, plazo, administrador del contrato) y la matriz con rubro, producto, subproducto, descripción, cant., unidad, días y observación; los errores de la IA se muestran en español y no crean resultados confirmados.
+5. La matriz se edita, agrupa por rubro y numera 1.1, 1.2…; cada ítem admite un responsable de la lista desplegable; se guarda y se confirma; el responsable puede cambiarse después de confirmar.
+6. El JSON original de la IA queda intacto y separado de las ediciones; reprocesar no modifica lo confirmado.
+7. Ninguna credencial, clave de IA ni consulta SQL llega al navegador.
+8. `pnpm lint`, `pnpm typecheck`, `pnpm test` y `pnpm build` sin errores.
 
-### V8. Resultado
+### R8. Riesgos
 
-**2026-11-26 — Instalación (paso 3).** El usuario aprobó los 14 paquetes y pidió **solo instalar, sin escribir código todavía**. Se creó únicamente el manifiesto mínimo `apps/web/package.json` (necesario para instalar). Versiones instaladas: `next` 16.4.6, `react`/`react-dom` 19.3.1, `zod` 4.6.7, `@tanstack/react-table` 9.3.1, `tailwindcss`/`@tailwindcss/postcss` 4.3.5, `postcss` 8.5.33, `@types/react` 19.3.3, `@types/react-dom` 19.3.0, `typescript` 7.0.2, `eslint` 10.15.0, `eslint-config-next` 16.4.6, `vitest` 5.1.2.
+- **Alcance amplio** (cuatro subfases en una tarea): mitigado con etapas y revisión tuya entre ellas.
+- **Renombrar tablas** rompe referencias en pruebas y código de `packages/db`; se actualizan en el mismo paso y se verifica con las pruebas. Si en algún momento hay datos en `erp`, renombrar sigue sin borrarlos, pero conviene un respaldo previo.
+- **Coste y privacidad de la IA:** las llamadas reales tienen coste y envían el TDR al proveedor; sin tu autorización solo se usarán PDF sintéticos.
+- **PDF extensos:** pueden superar límites de tamaño o de salida del modelo; se informan como error controlado. Dividir documentos requiere una aprobación aparte (`AGENTS.md` §8).
+- **Procesamiento en el proceso del servidor:** un reinicio interrumpe el trabajo; se detecta y se marca como error. No es apto para producción sin reevaluar.
+- **Fuente Inter:** el primer build necesita internet; si falla, se usa la fuente del sistema como respaldo.
+- **Numeración derivada:** el número 1.1 cambia al reordenar o mover ítems entre rubros; es de presentación y no se usa como referencia estable.
+- **Datos del prototipo:** contiene nombres de personas, proyectos y montos; no se copian a la aplicación ni al repositorio.
+- **Prototipo sin autenticación:** solo local y con datos autorizados.
 
-**Resuelto el mismo día, con aprobación del usuario:** en `apps/web` se fijaron `typescript` **6.0.3** y `eslint` **9.39.5** (versiones exactas, sin `^`, para que una actualización no vuelva a romper la compatibilidad). `pnpm peers check`: sin problemas. TypeScript 6.0.3 expone la API que usa Next.js; `packages/db` sigue con TypeScript 7.0.2 y sus 27 pruebas y la verificación de tipos siguen en verde. npm marca ESLint 9.39.5 como obsoleto (existe la 10), pero es la última compatible con `eslint-config-next` 16.4.6; revisar cuando Next.js admita ESLint 10. La instalación falló tres veces en Windows al renombrar la carpeta de `next` y funcionó con `--config.child-concurrency=1`.
+### R9. Resultado
 
-Incompatibilidades detectadas inicialmente (`pnpm peers check`):
-- **TypeScript 7.0.2:** no expone la API de JavaScript clásica (`createProgram` no existe). Next.js la usa para verificar tipos en el build y sugiere `typescript@^6.0.0`; `typescript-eslint` (de `eslint-config-next`) exige `>=4.8.4 <6.1.0`. Propuesta: `typescript@6.0.3` solo en `apps/web` (`packages/db` sigue con 7.0.2).
-- **ESLint 10.15.0:** los plugins de `eslint-config-next` (`import`, `jsx-a11y`, `react`) admiten hasta ESLint 9. Propuesta: `eslint@9.39.5`.
+**2026-11-26 — Etapa A completada** (pasos 1–6). Pendiente: tu revisión visual antes de empezar la etapa B.
 
-Otros avisos: pnpm muestra «Agent skills awaiting approval: @tanstack/react-table» (no se aprobó; no es necesario para la aplicación). `sharp`, SWC de Next, `lightningcss` y Tailwind (oxide) se instalaron con binarios precompilados para Windows x64.
+- **Migración `0006_proyectos_trabajadores`:** validada primero en un esquema temporal dentro de una transacción revertida (up de 0001–0006, 14 comprobaciones, down de 0006–0001, sin objetos restantes); después aplicada en `erp_test` y `erp`. `pnpm db:status`: 0 pendientes. Ambos esquemas estaban vacíos.
+- **`packages/db`:** repositorios con SQL parametrizado (`clients`, `projects`, `workers`, `documents`) y concurrencia optimista (`VersionConflictError`). Los repositorios de extracciones, ítems y asignaciones se escriben en las etapas C y D, cuando se usen.
+- **`apps/web`:** configuración (Next.js 16 con Turbopack, `@erp/db` del workspace, `.env` raíz cargado solo en el servidor, servidor en `127.0.0.1:3000`), tokens del prototipo en Tailwind 4, modo claro/oscuro, Inter con `next/font`. Pantallas: Proyectos (lista, alta con contratante nuevo o existente, edición), Requerimiento (documento TDR y matriz con sus controles deshabilitados y rotulados por etapa; ficha del proyecto editable) y Trabajadores (lista, alta, edición, activar/desactivar).
+- **Verificación:** `pnpm lint`, `pnpm typecheck` y `pnpm build` sin errores; `pnpm test`: 39 pruebas de base (`erp_test`) + 24 de validación y formato. En el navegador integrado: errores de validación en español conservando lo escrito, alta de proyecto con contratante nuevo, ficha con monto «286.400,50» guardado como `286400.50`, alta y desactivación de trabajador, modo oscuro y vista móvil; sin errores en consola ni en el servidor. El código del navegador no contiene SQL ni datos de conexión.
+- Los tres registros sintéticos («PRUEBA …») creados para la prueba en `erp` se borraron al terminar; `erp` queda vacío.
+- Cambios menores respecto al plan: no se modificó `.env.example` (las variables nuevas llegan en las etapas B y C); se añadió `.claude/launch.json` para levantar el servidor desde la app.
 
-Pasos 2 y 4–12 sin iniciar: no se escribió configuración ni código.
+**2026-11-26 — Etapa B completada** (paso 7, subfase 1.2). El usuario aprobó continuar y pidió **no inventar datos**: usará un TDR real como prueba. No se crearon proyectos ni se subieron PDF de prueba a `erp`.
+
+- **Carga:** `POST /api/proyectos/[id]/tdr` (multipart, campo `archivo`). Rechaza otro origen (403), proyecto inexistente (404), cuerpo mayor que el límite (413), archivo vacío, sin extensión `.pdf`, con tipo declarado distinto de PDF o sin la firma `%PDF-` en el primer kilobyte (400) y el mismo PDF ya cargado en el proyecto (409, por SHA-256 y por la restricción única de la base).
+- **Almacenamiento:** interfaz `FileStorage` y adaptador local (`apps/web/src/integrations/storage`). Clave opaca `tdr/<proyecto>/<uuid>.pdf`, nunca la ruta ni el nombre original; no sobrescribe; doble defensa contra *path traversal*. Carpeta por omisión `storage/` en la raíz (ya en `.gitignore`); configurable con `STORAGE_LOCAL_DIR` y `TDR_MAX_BYTES` (documentadas en `.env.example`). Si falla el registro en la base, el archivo se borra.
+- **Consulta y eliminación:** `GET /api/tdr/[id]` muestra el PDF original (sin caché, `nosniff`). «Eliminar» solo existe para documentos sin intentos de extracción, pide confirmación y borra registro y archivo en una transacción.
+- **Pantalla Requerimiento:** el botón «Cargar TDR» y la zona de arrastrar y soltar están activos, con progreso, cancelación y mensajes en español; la lista muestra nombre, tamaño, fecha, estado, «Ver PDF» y «Eliminar». «Procesar TDR con IA» y «+ Ítem» siguen deshabilitados (etapas C y D). `page_count` queda nulo (sin librería de PDF, según R-D8).
+- **Verificación:** lint, tipos y build sin errores; `pnpm test`: 41 pruebas de base y 42 de web (validación del PDF con bytes mínimos que no representan ningún TDR, almacenamiento en carpeta temporal, limpieza ante fallo, duplicados). Comprobado con peticiones HTTP que no escriben datos: 403 sin origen o con otro origen, 404 para proyecto o documento inexistente e id no válido. **Verificado con el TDR real del usuario (2026-11-26):** un PDF de ~2 MB cargado en su proyecto; el archivo existe en `storage/` (ignorado por Git), tamaño y SHA-256 coinciden con `tdr_documents`, cabecera PDF válida, `GET /api/tdr/[id]` responde 200 `application/pdf`. Según los registros del servidor, el usuario también lo eliminó y lo volvió a cargar: sin archivos huérfanos (1 registro, 1 archivo). Contenido del documento no leído ni registrado.
+
+**2026-11-26 — Ajuste solicitado por el usuario: campo «Valor del proyecto».** El usuario pidió un campo para el valor del proyecto, sin decidir aún si se ingresa al crear el proyecto o al subir el TDR, y que sea fácil de mover. Usa el dato existente `projects.contract_amount` / `currency` / `amount_includes_vat` (el mismo «monto» de la ficha y del contrato de la IA); sin cambios de base de datos.
+
+- Componentes: `ProjectValueFields` (solo los campos, para incluir en cualquier formulario) y `ProjectValueForm` (formulario autónomo con «Guardar valor»), en `apps/web/src/components/forms/`. Validación única `projectValueFields` / `projectValueSchema` en `server/schemas.ts`; acción `saveProjectValue`; conversión `lib/project-value.ts`.
+- Ubicaciones: alta y edición del proyecto (dentro del formulario), Requerimiento en la tarjeta «Documento TDR» bajo la zona de carga (formulario autónomo) y edición de la ficha. En la ficha el rótulo pasa a «Valor del proyecto». Moverlo = mover una línea de JSX.
+- Verificación: 45 pruebas web (incluye validación compartida y conversión), 41 de base, lint, tipos y build en verde; revisión visual de ambas pantallas. **No se guardó ningún valor desde el navegador** para no modificar el proyecto real del usuario; el guardado se cubre con las pruebas del esquema y del repositorio (`updateProject`).
+- Observado: el TDR real se eliminó desde la pantalla tras la verificación anterior (acción del usuario según el registro del servidor); base y `storage/` quedaron coherentes (0 y 0).
+
+#### R10. Etapa C sin proveedor elegido (decisión del usuario, 2026-11-26)
+
+El usuario todavía no elige proveedor. Pidió dejar todo listo para solo poner la clave y el modelo, y una primera versión del prompt para ir ajustándola, con la respuesta estructurada según el contrato de `AGENTS.md` §8. Respuestas a las preguntas:
+
+- **SDK:** no se instala ninguno por ahora. Al elegir proveedor hay que instalar su SDK oficial (con aprobación) y escribir su adaptador; queda anotado en `MEMORY.md`.
+- **Proveedor y modelo:** solo en `.env` (`AI_PROVIDER`, `AI_MODEL` y la clave del proveedor). Cada intento registra proveedor y modelo.
+
+Alcance de esta parte (sin dependencias nuevas ni cambios de base de datos):
+
+1. Contrato de salida `tdr-v1`: esquema zod (validación en el backend) y JSON Schema para la salida estructurada de los proveedores.
+2. Prompt de extracción `tdr-extraccion-v1`, versionado en su propio archivo.
+3. Interfaz común de IA (petición, resultado normalizado, errores clasificados, capacidades) y registro de adaptadores, vacío hasta instalar un SDK.
+4. Configuración desde `.env` con un estado legible en pantalla (qué falta: proveedor, modelo, clave o adaptador), sin mostrar la clave.
+5. Servicio de extracción: intento `pending` con clave de idempotencia, procesamiento en el servidor local, tiempo máximo, reintentos acotados solo para fallos transitorios, validación, `processed` o `failed` con mensaje seguro; intentos interrumpidos se marcan como error. Si la respuesta no cumple el contrato se conserva tal cual en el intento fallido para ajustar el prompt.
+6. Pantalla: «Procesar TDR con IA» se activa solo si la configuración está completa; estado del intento con actualización automática; resumen y JSON del resultado para revisar el prompt. La matriz editable sigue en la etapa D.
+7. Pruebas con un adaptador simulado (sin llamadas reales ni coste).
+
+**2026-11-26 — Etapa C preparada sin proveedor** (alcance R10). Sin dependencias nuevas ni cambios de base de datos.
+
+- Contrato `tdr-v1` (`apps/web/src/domain/tdr-extraction/contract.ts`): zod estricto (campos exactos, cantidades y días ≥ 0, fechas válidas y en orden, moneda ISO, ítems sin repetir, máx. 2000 filas) y JSON Schema equivalente; una prueba comprueba que ambos declaran los mismos campos.
+- Prompt `tdr-extraccion-v1` (`apps/web/src/prompts/tdr-extraccion/v1.ts`), común a los proveedores, con las reglas de `AGENTS.md` §8 y protección ante instrucciones dentro del PDF. Para ajustarlo: copiar a `v2.ts` y apuntar `CURRENT_PROMPT`.
+- Interfaz común (`integrations/ai/types.ts`), configuración desde `.env` con estado público sin clave (`config.ts`) y registro de adaptadores vacío (`registry.ts`).
+- Repositorio de intentos (`packages/db/src/repositories/extractions.ts`): creación idempotente, `pending → processing → processed/failed`, intentos interrumpidos.
+- Servicio (`server/services/tdr-extraction.ts`) y orquestador (`server/extraction-runner.ts`): tiempo máximo total, reintentos con espera solo para errores transitorios, validación, mensajes seguros en español; la respuesta que no cumple el contrato (o que no es JSON) se guarda en el intento fallido para revisar el prompt. Registros solo con metadatos.
+- Pantalla: «Procesar TDR con IA» (clave de operación por clic) deshabilitado con la lista de lo que falta en `.env`; panel del último intento con estado, proveedor/modelo/prompt, duración, tokens, error, ficha propuesta en violeta y JSON original; matriz con la propuesta en solo lectura numerada 1.1, 1.2…; actualización automática mientras procesa.
+- `.env.example`: `AI_PROVIDER`, `AI_MODEL`, claves por proveedor, `AI_TIMEOUT_MS`, `AI_MAX_RETRIES`, `AI_MAX_CONCURRENCY` (sustituyen las líneas `CLAUDE_*`/`OPENAI_MODEL`).
+- Verificación: 45 pruebas de base y 76 de web (incluye 14 del servicio con adaptador simulado: éxito, reintentos, errores sin reintento, timeout, respuesta fuera de contrato, texto no JSON, modelo sin capacidades, PDF ilegible); lint, tipos y build sin errores; el código del navegador no contiene claves ni el prompt. En pantalla se comprobó el estado «IA no configurada». **Sin verificar:** paneles de intento procesado o fallido con datos reales (no hay adaptador ni se crearon datos de prueba en `erp`).
+
+### Antecedente: instalación del plan 1.0b (2026-11-26)
+
+El usuario aprobó los 14 paquetes del plan 1.0b y pidió solo instalarlos. Se creó únicamente `apps/web/package.json`. Versiones: `next` 16.4.6, `react`/`react-dom` 19.3.1, `zod` 4.6.7, `@tanstack/react-table` 9.3.1, `tailwindcss`/`@tailwindcss/postcss` 4.3.5, `postcss` 8.5.33, `@types/react` 19.3.3, `@types/react-dom` 19.3.0, `typescript` **6.0.3** y `eslint` **9.39.5** (fijadas sin `^` por compatibilidad con Next.js y `eslint-config-next`; `packages/db` sigue con TypeScript 7.0.2), `eslint-config-next` 16.4.6, `vitest` 5.1.2. `pnpm peers check` sin problemas. En Windows la instalación necesitó `--config.child-concurrency=1`. pnpm avisa «Agent skills awaiting approval: @tanstack/react-table» (no aprobado; no hace falta).
+
+Las pantallas originales del plan 1.0b (eventos, clientes y tabla de ocho columnas en `/desarrollo/tabla`) quedan sustituidas por las de R3.
 
 ---
 

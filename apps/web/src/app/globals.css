@@ -1,0 +1,224 @@
+@import 'tailwindcss';
+
+/* Tokens del prototipo CAVE-ERP-v3 (AGENTS.md §6, «Guía visual»). */
+:root {
+  --nav: #0e1d33;
+  --nav2: #162943;
+  --navtx: rgb(255 255 255 / 0.66);
+  --bg: #f5f7fa;
+  --card: #ffffff;
+  --ink: #0f1a2a;
+  --ink2: #44536b;
+  --mut: #7a8799;
+  --mut2: #9aa6b6;
+  --line: #e4e9f0;
+  --line2: #d3dbe6;
+  --bl: #1f5fcc;
+  --bl2: #e8f0fd;
+  --blx: #153e85;
+  --ok: #0e7a52;
+  --okb: #e3f5ec;
+  --wa: #9a6400;
+  --wab: #fdf1dc;
+  --ba: #b4302a;
+  --bab: #fbe9e8;
+  --vi: #5b4bb7;
+  --vib: #eeebfa;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --nav: #0a1422;
+  --nav2: #132236;
+  --navtx: rgb(255 255 255 / 0.6);
+  --bg: #0e1726;
+  --card: #152133;
+  --ink: #e8edf5;
+  --ink2: #afbdd1;
+  --mut: #8495ac;
+  --mut2: #6b7b92;
+  --line: #22304a;
+  --line2: #2c3d5c;
+  --bl: #5b93f5;
+  --bl2: #16294a;
+  --blx: #a8c6fa;
+  --ok: #49c089;
+  --okb: #102e22;
+  --wa: #e0a33c;
+  --wab: #2e2415;
+  --ba: #f0736b;
+  --bab: #30191a;
+  --vi: #9b8deb;
+  --vib: #1f1b38;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-nav: var(--nav);
+  --color-nav2: var(--nav2);
+  --color-navtx: var(--navtx);
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink2);
+  --color-mut: var(--mut);
+  --color-mut2: var(--mut2);
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-bl: var(--bl);
+  --color-bl2: var(--bl2);
+  --color-blx: var(--blx);
+  --color-ok: var(--ok);
+  --color-okb: var(--okb);
+  --color-wa: var(--wa);
+  --color-wab: var(--wab);
+  --color-ba: var(--ba);
+  --color-bab: var(--bab);
+  --color-vi: var(--vi);
+  --color-vib: var(--vib);
+  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@layer base {
+  html,
+  body {
+    min-height: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 13.5px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'tnum', 'cv05';
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    outline: 2px solid var(--bl);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Rótulos en mayúsculas con espaciado amplio, como en el prototipo. */
+  .u {
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid var(--line2);
+    color: var(--ink2);
+    background: var(--card);
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) {
+    border-color: var(--mut);
+  }
+  .btn:disabled {
+    opacity: 0.55;
+  }
+  .btn-p {
+    background: var(--bl);
+    border-color: var(--bl);
+    color: #fff;
+  }
+  .btn-p:hover:not(:disabled) {
+    background: var(--blx);
+    border-color: var(--blx);
+  }
+  .btn-g {
+    border-color: transparent;
+    color: var(--bl);
+    background: var(--bl2);
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 18px;
+  }
+
+  .field {
+    width: 100%;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--line2);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    outline: none;
+  }
+  .field:focus {
+    border-color: var(--bl);
+    box-shadow: 0 0 0 3px var(--bl2);
+  }
+  .field[aria-invalid='true'] {
+    border-color: var(--ba);
+  }
+  .label {
+    display: block;
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--mut2);
+    margin-bottom: 5px;
+  }
+
+  .tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  .tbl th {
+    text-align: left;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--mut);
+    background: var(--bg);
+    padding: 9px 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--line);
+  }
+  .tbl td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  .tbl tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .tbl tbody tr:hover {
+    background: var(--bg);
+  }
+  .tbl .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .tbl td small {
+    display: block;
+    color: var(--mut2);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+}

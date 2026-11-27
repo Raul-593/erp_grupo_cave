@@ -2,9 +2,18 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
-  "description": "Interfaz web de erp_v1 (Next.js)",
+  "description": "Interfaz web de erp_v1 (Next.js): Operación › Requerimiento",
   "type": "module",
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 3000",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 3000",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
   "dependencies": {
+    "@erp/db": "workspace:*",
     "@tanstack/react-table": "^9.3.1",
     "next": "^16.4.6",
     "react": "^19.3.1",

@@ -6,29 +6,45 @@ erp_v1 es un sistema web de gestión de eventos para una empresa dedicada a la p
 
 El objetivo a largo plazo es centralizar integralmente la gestión de eventos, desde la recepción del TDR hasta el cierre operativo y financiero, incluyendo clientes, recursos, documentos, presupuestos, responsables, aprobaciones, proveedores, pagos, evidencias y reportes.
 
-La versión 1 (V1) comprende las ocho fases funcionales de la sección 12. La primera entrega (MVP o Fase 1) se concentra exclusivamente en el procesamiento automatizado de TDR y la gestión mínima para asociar los resultados a un evento. No confundir el MVP con el alcance completo de V1.
+La versión 1 (V1) comprende las ocho fases funcionales de la sección 12. La primera entrega (MVP o Fase 1) se concentra exclusivamente en el procesamiento automatizado de TDR y la gestión mínima para asociar los resultados a un proyecto. No confundir el MVP con el alcance completo de V1.
 
 Los TDR son documentos PDF proporcionados por diferentes clientes. Su estructura, extensión, tablas, títulos y distribución de información pueden variar. No se debe diseñar una solución dependiente de un cliente, plantilla o número de página específico.
 
+### Terminología (decisión del usuario, 2026-11-26)
+
+| Término en pantalla | Significado | Entidad en base de datos |
+| --- | --- | --- |
+| Empresa | Razón social del holding que ejecuta el proyecto (por ejemplo, Grupo CAVE) | `companies` (preparada en esquema; sin interfaz en Fase 1) |
+| Proyecto | Unidad de trabajo con un contratante y un requerimiento; antes llamado «evento» | `projects` (antes `events`) |
+| Contratante | Cliente que emite el TDR | `clients` |
+| Requerimiento | TDR cargado y su matriz de entregables | `tdr_documents`, `tdr_extractions`, `tdr_items` |
+| Rubro / producto / subproducto | Tres niveles de la matriz de entregables (ver §8) | columnas de `tdr_items` |
+| Responsable | Trabajador asignado a un ítem de la matriz | `workers` y `tdr_item_assignments` |
+
+La empresa todavía no se gestiona en la interfaz: el esquema queda preparado para incorporarla sin reescribir el núcleo. «Evento» se sigue usando para la ceremonia o actividad física que se produce, no para la entidad principal.
+
 ## 2. Alcance de la primera entrega (Fase 1)
+
+La Fase 1 se implementa como el módulo **Operación › Requerimiento** del prototipo visual (§6, «Guía visual»). Los demás módulos del prototipo no se implementan en esta fase.
 
 El flujo principal debe permitir:
 
-1. Registrar o seleccionar un cliente y un evento.
-2. Cargar un archivo PDF correspondiente al TDR del evento.
+1. Registrar o seleccionar un contratante y un proyecto.
+2. Cargar un archivo PDF correspondiente al TDR del proyecto.
 3. Presionar el botón «Procesar TDR con IA».
 4. Enviar el documento y un prompt reutilizable a una IA desde el backend.
-5. Recibir y validar una respuesta JSON estructurada.
-6. Presentar el desglose de productos y servicios en una tabla editable.
-7. Permitir al usuario revisar, corregir, añadir o eliminar filas antes de confirmar.
-8. Guardar el resultado confirmado en PostgreSQL y conservar su relación con el documento y el evento.
+5. Recibir y validar una respuesta JSON estructurada con la **ficha del proyecto** y la **matriz de entregables** (§8).
+6. Presentar la ficha y el desglose en pantalla, editables.
+7. Permitir al usuario revisar, corregir, añadir o eliminar filas y asignar a cada ítem **un responsable**, elegido de una lista desplegable con los nombres de los trabajadores registrados.
+8. Guardar el resultado confirmado en PostgreSQL y conservar su relación con el documento y el proyecto.
 
-La extracción no debe generar precios ni presupuestos en esta fase.
+La extracción no debe generar precios ni presupuestos en esta fase. El monto del contrato o presupuesto referencial **se transcribe** del TDR cuando el documento lo indica (dato leído, no estimado); la estimación de precios sigue en la Fase 2. La IA nunca asigna responsables: la asignación es siempre humana.
 
 ### Fuera del alcance de la Fase 1 (incluido en fases posteriores de V1 cuando corresponda)
 
 - Estimación de precios unitarios mediante IA, presupuestos y ofertas económicas.
-- Asignación de responsables, permisos multiusuario e informes con revisión y aprobación.
+- Tareas, fechas y seguimiento de responsables (más allá de un responsable por ítem), permisos multiusuario e informes con revisión y aprobación.
+- Los demás módulos del prototipo: planificación, abastecimiento, ejecución, cierre, finanzas, administración, portal del proveedor, comercial, marketing y talento; también las solicitudes de cotización, el comparativo de proveedores y las versiones o adendas del requerimiento.
 - Operación sin conexión y sincronización de evidencias.
 - Gestión de proveedores, inventario, compras, facturación y contabilidad.
 - Carga de fotografías de eventos y generación de reportes fotográficos.
@@ -48,7 +64,8 @@ No implementar estos módulos de manera anticipada. Diseñar únicamente las int
 | Almacenamiento de archivos en producción previsto | Supabase Storage, con buckets privados |
 | Inteligencia artificial | Multiproveedor mediante una conexión común (interfaz de proveedor con un adaptador por compañía: OpenAI, Anthropic, Google u otros). Proveedor y modelo configurables; no se restringe a un solo modelo ni a una sola compañía |
 | Hosting existente | Netlify y dominio de la empresa |
-| Frontend | React/Next.js |
+| Frontend | React/Next.js (versiones y librerías de interfaz: ver `PLAN.md`, tarea 1.0b) |
+| Referencia visual | Prototipo HTML `CAVE-ERP-v3` entregado por el usuario (fuera del repositorio); ver §6, «Guía visual» |
 | Backend | Node.js |
 | Lenguaje y gestor de paquetes | TypeScript; pnpm (workspace con `packages/*` y `apps/*`) |
 | ORM o herramienta de migraciones | Aprobado: migraciones SQL con node-pg-migrate y driver `pg` (`packages/db`) |
@@ -129,7 +146,7 @@ Separar claramente las responsabilidades, adaptando las carpetas a la tecnologí
 
 - Presentación: vistas, formularios, componentes y tabla editable.
 - API: endpoints, autenticación, autorización y validación de entrada.
-- Servicios de aplicación: clientes, eventos, documentos y procesamiento TDR.
+- Servicios de aplicación: contratantes, proyectos, trabajadores, documentos y procesamiento TDR.
 - Dominio: reglas de negocio independientes del proveedor de IA y almacenamiento.
 - Persistencia: repositorios, consultas y migraciones PostgreSQL.
 - Integraciones: interfaz común de IA con adaptadores por proveedor y adaptadores de almacenamiento.
@@ -137,6 +154,18 @@ Separar claramente las responsabilidades, adaptando las carpetas a la tecnologí
 - Pruebas: unitarias, integración y casos representativos de TDR.
 
 No acceder a ningún proveedor de IA directamente desde el navegador. No concentrar la lógica de extracción, validación, persistencia y presentación en un único componente o endpoint.
+
+### Guía visual (prototipo CAVE ERP)
+
+La interfaz reproduce el estilo del prototipo `CAVE-ERP-v3`. Se toma su diseño, no sus datos: los nombres, montos y proyectos del prototipo son ilustrativos y no se cargan como datos ni como semillas.
+
+- **Estructura:** barra lateral oscura fija (logo «CAVE ERP», grupos de navegación en mayúsculas, ítem activo con borde azul a la izquierda); barra superior blanca con selector de proyecto; subnavegación por pestañas en mayúsculas; contenido con ancho máximo de 1420 px. En pantallas de menos de 880 px la barra lateral se oculta tras un botón de menú.
+- **Navegación en Fase 1:** solo se muestra lo implementado: Operación › Proyectos (alta y selección mínima), Operación › Requerimiento y el catálogo mínimo de trabajadores que alimenta la lista de responsables. Los módulos restantes del prototipo (Planificación, Abastecimiento, Ejecución, Cierre, Finanzas, Administración, Portal proveedor, Comercial, Marketing, Talento, Mi día) no aparecen hasta su fase. El selector «Empresa» se incorpora cuando se implemente `companies`.
+- **Pantalla Requerimiento:** encabezado con título en mayúsculas, subtítulo y acciones («+ Ítem», «Cargar TDR» como botón principal); tarjeta «Ficha del proyecto» en cuadrícula de etiqueta/valor; tarjeta «Matriz de entregables» con las columnas Ítem, Producto (con el rubro debajo en texto secundario), Subproducto, Descripción, Cant., Unidad, Días, Observaciones y **Responsable** (lista desplegable). Pie con el total de ítems y rubros. Las tarjetas de cotizaciones, comparativo y versiones/adendas del prototipo quedan para fases posteriores.
+- **Tokens:** se conservan los colores del prototipo como variables CSS (modo claro y oscuro): navegación `#0E1D33`, fondo `#F5F7FA`, tarjeta `#FFFFFF`, texto `#0F1A2A`, líneas `#E4E9F0`, azul primario `#1F5FCC`, éxito `#0E7A52`, advertencia `#9A6400`, error `#B4302A` y violeta `#5B4BB7` para todo lo que proviene de la IA. Los estados se muestran como etiquetas («pill») de color.
+- **Tipografía:** Inter 400/500/600 con cifras tabulares; títulos y rótulos en mayúsculas con espaciado amplio; tamaño base 13,5 px.
+- **Contenido de IA:** todo valor propuesto por la IA se distingue visualmente (violeta, rótulo «Propuesta IA») hasta que el usuario lo confirma.
+- Idioma de la interfaz: español; fechas en `America/Guayaquil`; números con formato `es-EC`.
 
 ## 7. PostgreSQL local y migración futura a Supabase
 
@@ -153,19 +182,26 @@ No acceder a ningún proveedor de IA directamente desde el navegador. No concent
 - La migración futura deberá validar versiones, extensiones, esquema, datos, restricciones, índices, permisos, RLS y archivos. Probar primero en un entorno no productivo y disponer de un plan de reversión.
 - Si se propone `pg_dump`/`pg_restore`, considerar las restricciones de roles, propietarios y esquemas administrados de Supabase; no ejecutar la migración hasta aprobarla.
 
-### Modelo de datos conceptual inicial (pendiente de aprobación)
+### Modelo de datos
 
-| Entidad | Responsabilidad |
-| --- | --- |
-| `clients` | Información de clientes |
-| `events` | Eventos asociados a un cliente |
-| `tdr_documents` | Metadatos y referencia del PDF original asociado al evento |
-| `tdr_extractions` | Cada intento de procesamiento: estado, modelo, versión de prompt, respuesta original JSONB y errores controlados |
-| `tdr_items` | Filas editables y confirmadas vinculadas a una extracción |
+Migraciones `0001`–`0005` aplicadas (subfase 1.1) con `clients`, `events`, `tdr_documents`, `tdr_extractions` y `tdr_items`. Los cambios de la terminología de §1 se proponen en una migración nueva (`0006`, ver `PLAN.md`); las migraciones aplicadas no se editan.
 
-Relaciones conceptuales: un cliente puede tener varios eventos; un evento puede tener varios TDR; cada TDR puede tener varios intentos de extracción; cada extracción puede tener múltiples ítems.
+| Entidad | Responsabilidad | Estado |
+| --- | --- | --- |
+| `companies` | Empresas del holding que ejecutan proyectos | Propuesta (`0006`); sin interfaz en Fase 1 |
+| `clients` | Contratantes | Existente |
+| `projects` | Proyectos de un contratante, opcionalmente de una empresa; datos de la ficha del proyecto | Propuesta (`0006`): renombrar `events` y añadir columnas de la ficha |
+| `tdr_documents` | Metadatos y referencia del PDF original asociado al proyecto | Existente (`event_id` pasaría a `project_id`) |
+| `tdr_extractions` | Cada intento de procesamiento: estado, proveedor, modelo, versión de prompt, respuesta original JSONB y errores controlados | Existente |
+| `tdr_items` | Filas editables y confirmadas vinculadas a una extracción | Existente (añadir `rubro`) |
+| `workers` | Trabajadores que pueden ser responsables de un ítem (nombre, cargo, activo) | Propuesta (`0006`) |
+| `tdr_item_assignments` | Responsable único de cada ítem | Propuesta (`0006`) |
 
-Estos nombres y entidades son una propuesta, no una orden para crear tablas sin aprobar el modelo. Definir antes de implementar la política de versiones y cuál extracción queda confirmada o vigente para un evento/documento.
+Relaciones: una empresa puede tener varios proyectos; un contratante puede tener varios proyectos; un proyecto puede tener varios TDR; cada TDR puede tener varios intentos de extracción; cada extracción puede tener múltiples ítems; cada ítem tiene como máximo un responsable.
+
+La asignación del responsable vive en una tabla separada de `tdr_items` porque los ítems de una extracción confirmada son inmutables, mientras que el responsable debe poder cambiarse después de confirmar. Los trabajadores no son usuarios del sistema: su vínculo con cuentas de usuario se define en la Fase 3. Un trabajador con asignaciones no se borra; se desactiva.
+
+Política vigente: como máximo una extracción confirmada por documento; reprocesar crea un nuevo intento y nunca modifica el confirmado.
 
 ## 8. Integración con proveedores de IA
 
@@ -193,13 +229,35 @@ Estos nombres y entidades son una propuesta, no una orden para crear tablas sin 
 
 ### Contrato de salida de la extracción
 
-La respuesta debe contener un objeto con la propiedad `items`, que es un arreglo. Todos los campos son obligatorios en cada registro, aunque algunos admiten `null`.
+La respuesta debe contener un objeto con dos propiedades: `ficha` (datos generales del proceso) e `items` (arreglo con la matriz de entregables). Todos los campos son obligatorios, aunque algunos admiten `null`. Cambiar este contrato exige subir `schema_version`.
+
+#### `ficha` — ficha del proyecto
 
 | Campo | Tipo | Significado |
 | --- | --- | --- |
-| `item` | integer | Número secuencial de la fila, desde 1 |
-| `producto` | string | Categoría o producto principal, por ejemplo Sonido |
-| `subproducto` | string | Recurso específico, por ejemplo Micrófono inalámbrico |
+| `contratante` | string o null | Entidad que contrata, tal como aparece en el TDR |
+| `ruc_contratante` | string o null | RUC del contratante si el documento lo indica |
+| `codigo_proceso` | string o null | Código del proceso de contratación |
+| `objeto` | string o null | Objeto de la contratación |
+| `monto` | number o null | Monto del contrato o presupuesto referencial **indicado en el TDR**; nunca estimado |
+| `moneda` | string o null | Código ISO 4217 (por ejemplo `USD`) |
+| `incluye_iva` | boolean o null | Si el documento indica que el monto incluye IVA |
+| `sedes` | arreglo de string | Ciudades o lugares de ejecución; vacío si no se indican |
+| `fecha_inicio`, `fecha_fin` | string `AAAA-MM-DD` o null | Fechas de ejecución explícitas; no se calculan a partir de un plazo |
+| `plazo` | string o null | Plazo tal como lo expresa el documento (por ejemplo «30 días calendario desde la firma») |
+| `administrador_contrato` | string o null | Nombre o cargo del administrador del contrato |
+| `observacion` | string o null | Incertidumbres, contradicciones y páginas de origen de estos datos |
+
+El contratante extraído no crea registros automáticamente: el usuario lo vincula a un contratante existente o confirma crear uno nuevo. La ficha se aplica al proyecto solo al confirmar.
+
+#### `items` — matriz de entregables
+
+| Campo | Tipo | Significado |
+| --- | --- | --- |
+| `item` | integer | Número secuencial de la fila, desde 1, en el orden del documento |
+| `rubro` | string | Gran grupo del requerimiento, por ejemplo «Audio, luces y video» |
+| `producto` | string | Bien, servicio o personal entregable, por ejemplo «Pantalla LED P3 6 × 3 m» |
+| `subproducto` | string o null | Componente o tipo específico dentro del producto, por ejemplo «Video»; `null` si no existe uno identificable (no inventarlo) |
 | `descripcion` | string | Especificaciones técnicas y características solicitadas |
 | `cant` | number o null | Cantidad del recurso, sin multiplicarla automáticamente por días |
 | `unidad` | string o null | Unidad, persona, sistema, servicio, metro, etc. |
@@ -210,22 +268,38 @@ Ejemplo ilustrativo (no representa la extracción completa de un TDR):
 
 ```json
 {
+  "ficha": {
+    "contratante": "Entidad contratante de ejemplo",
+    "ruc_contratante": null,
+    "codigo_proceso": "PROCESO-EJEMPLO-001",
+    "objeto": "Servicios logísticos para ceremonias de graduación",
+    "monto": 250000,
+    "moneda": "USD",
+    "incluye_iva": false,
+    "sedes": ["Guayaquil", "Quito"],
+    "fecha_inicio": null,
+    "fecha_fin": null,
+    "plazo": "30 días calendario desde la firma del contrato",
+    "administrador_contrato": null,
+    "observacion": "Monto referencial sin IVA, p. 3. Fechas de ceremonias no definidas."
+  },
   "items": [
     {
       "item": 1,
-      "producto": "Sonido",
-      "subproducto": "Micrófono inalámbrico",
+      "rubro": "Audio, luces y video",
+      "producto": "Micrófono inalámbrico",
+      "subproducto": "Sonido",
       "descripcion": "Micrófono profesional de alta gama para autoridades y presentadores",
       "cant": 3,
       "unidad": "Unidad",
       "dias": 18,
-      "observacion": "Incluido en audio de auditorio. Guayaquil: 7 días; Quito: 7 días; Cuenca: 4 días. Programación referencial. TDR UNEMI, pp. 48-49."
+      "observacion": "Incluido en audio de auditorio. Guayaquil: 7 días; Quito: 7 días; Cuenca: 4 días. Programación referencial. pp. 48-49."
     }
   ]
 }
 ```
 
-`item` es numeración de presentación, no clave primaria. No añadir campos a la tabla de usuario sin aprobación; se pueden proponer metadatos internos separados para trazabilidad.
+`item` es el orden de presentación, no clave primaria. En pantalla se muestra con numeración jerárquica `rubro.ítem` (1.1, 1.2, 2.1…), calculada por el sistema según el orden de aparición de cada rubro; no se guarda. El **responsable** no forma parte del contrato de la IA: es un dato interno que se asigna en la tabla editable. No añadir otros campos a la tabla de usuario sin aprobación; se pueden proponer metadatos internos separados para trazabilidad.
 
 ### Reglas de extracción del TDR
 
@@ -243,6 +317,8 @@ Ejemplo ilustrativo (no representa la extracción completa de un TDR):
 - Si dos cifras se contradicen para el mismo recurso y alcance, señalar ambas y dejar la cantidad sin confirmar. Distinguir una cantidad de paquetes de la cantidad de componentes dentro de cada paquete.
 - Reunir las especificaciones de tablas que continúan en otras páginas. Evitar duplicar recursos mencionados en diferentes secciones.
 - Incluir referencias a páginas del PDF en las observaciones siempre que se puedan identificar de manera fiable.
+- Agrupar los ítems en rubros coherentes con la estructura del documento (si el TDR ya define rubros o componentes, usar los suyos). No crear un rubro por ítem.
+- Para la ficha, transcribir solo lo que el documento dice. No calcular fechas a partir de plazos ni convertir montos; si hay varios montos (por ejemplo, con y sin IVA), registrar el principal y explicar los demás en `ficha.observacion`.
 - Devolver únicamente el JSON requerido; un arreglo vacío solo es válido si el documento se procesó correctamente y no contiene requerimientos pertinentes.
 
 ### Estados y revisión
@@ -256,11 +332,11 @@ El resultado de la IA, sea cual sea el proveedor, es una propuesta de extracció
 - No almacenar PDF ni imágenes como Base64 o binarios dentro de las tablas PostgreSQL.
 - Guardar los archivos mediante un adaptador con operaciones de carga, lectura y eliminación, evitando acoplar el dominio a rutas locales o a Supabase.
 - En desarrollo, utilizar una carpeta local privada fuera de las rutas públicas y excluida de Git. En producción, prever buckets privados de Supabase Storage.
-- Guardar en PostgreSQL una referencia estable al objeto, nombre original, tipo MIME, tamaño y relación con el evento o documento. Considerar hash de contenido para integridad y detección de duplicados.
+- Guardar en PostgreSQL una referencia estable al objeto, nombre original, tipo MIME, tamaño y relación con el proyecto o documento. Considerar hash de contenido para integridad y detección de duplicados.
 - Validar tamaño, extensión y contenido real del archivo. Generar nombres seguros en el servidor; prevenir path traversal y acceso no autorizado.
 - No exponer rutas internas ni enlaces públicos permanentes. En producción utilizar acceso autorizado o URLs firmadas de duración limitada.
 - Evitar archivos huérfanos: considerar compensación y limpieza cuando falle una operación que combina base de datos y almacenamiento.
-- Diseñar el almacenamiento de modo que posteriormente se puedan adjuntar fotografías a eventos, requerimientos, pagos y reportes. No implementar todavía estos módulos durante Fase 1.
+- Diseñar el almacenamiento de modo que posteriormente se puedan adjuntar fotografías a proyectos, requerimientos, pagos y reportes. No implementar todavía estos módulos durante Fase 1.
 - Prever identificadores estables generables en el cliente, claves de idempotencia, versiones de registros y almacenamiento privado para incorporar sincronización offline en Fase 8. Evaluar desde la arquitectura el soporte real en los dispositivos objetivo; no introducir una implementación offline anticipada.
 - Los respaldos de PostgreSQL no sustituyen los respaldos de archivos. Definir una estrategia independiente antes de producción.
 
@@ -270,7 +346,7 @@ El resultado de la IA, sea cual sea el proveedor, es una propuesta de extracció
 - Incluir un `.env.example` sin valores sensibles cuando se apruebe la configuración inicial. Variables previstas: `DATABASE_URL`, `DATABASE_SCHEMA`, `TEST_DATABASE_SCHEMA`, proveedor y modelo de IA por defecto (`AI_PROVIDER`, `AI_MODEL`), una clave por proveedor habilitado (por ejemplo `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`) y configuración del almacenamiento local. Los nombres definitivos se fijan en la subfase 1.3.
 - No usar claves de producción en el entorno local. No exponer credenciales de PostgreSQL, de ningún proveedor de IA ni claves privilegiadas de Supabase al frontend.
 - Validar datos en el servidor y utilizar consultas parametrizadas o un ORM con parámetros seguros.
-- Definir autenticación y autorización antes de permitir uso multiusuario o exposición externa. Aplicar mínimo privilegio y validar acceso al cliente, evento y documento en cada operación pertinente.
+- Definir autenticación y autorización antes de permitir uso multiusuario o exposición externa. Aplicar mínimo privilegio y validar acceso a la empresa, contratante, proyecto y documento en cada operación pertinente.
 - El prototipo sin autenticación, si se aprueba, debe ejecutarse únicamente de forma local y con datos autorizados.
 - No enviar datos a terceros distintos de los proveedores aprobados. Cada proveedor de IA se aprueba por separado: verificar autorización para procesar TDR reales y sus condiciones de privacidad y retención antes de enviarle datos de clientes. Para probar modelos sin esa verificación, usar únicamente documentos sintéticos o anonimizados.
 - No incluir secretos ni detalles internos del proveedor en mensajes de error visibles al usuario.
@@ -290,7 +366,7 @@ Casos mínimos:
 - Edición y confirmación de filas; reprocesamiento sin pérdida del resultado confirmado.
 - Acceso a documentos y resultados según permisos cuando se implemente autenticación.
 
-El MVP se considerará aceptable cuando se pueda cargar un TDR, procesarlo, visualizar las ocho columnas requeridas, corregir el resultado y persistirlo asociado al evento; los fallos deben mostrarse de forma controlada y no crear resultados confirmados incorrectos.
+El MVP se considerará aceptable cuando se pueda cargar un TDR, procesarlo, visualizar la ficha del proyecto y la matriz de entregables (rubro, producto, subproducto, descripción, cant., unidad, días y observación), asignar un responsable por ítem, corregir el resultado y persistirlo asociado al proyecto; los fallos deben mostrarse de forma controlada y no crear resultados confirmados incorrectos.
 
 Para evaluar la precisión de la IA, utilizar un conjunto autorizado de TDR con formatos diferentes y desgloses de referencia revisados por la empresa. Medir omisiones, duplicados y errores de cantidades, unidades, días y especificaciones, por proveedor y modelo, para poder compararlos con el mismo conjunto de documentos. No inventar umbrales de calidad; acordarlos antes del piloto productivo.
 
@@ -304,12 +380,12 @@ Subfases ordenadas:
 
 1. **1.0 Arquitectura y planificación:** inspeccionar el repositorio, proponer frontend, backend, herramienta de migraciones y estructura de carpetas. Evaluar la futura operación offline, autenticación y límites de Netlify para PDF extensos. Elaborar PLAN.md y proponer MEMORY.md. Esperar aprobación.
 2. **1.1 Base de datos:** configurar PostgreSQL local y pgAdmin, migraciones versionadas y entidades mínimas aprobadas. No crear una base de datos remota ni contratar servicios.
-3. **1.2 Carga de PDF:** registrar o seleccionar cliente y evento con los datos mínimos, validar y guardar el PDF en almacenamiento privado local.
-4. **1.3 Extracción IA:** botón «Procesar TDR con IA», prompt versionado, esquema de salida de ocho columnas, interfaz común de IA con al menos un adaptador de proveedor y selección configurable de proveedor/modelo, gestión de estados, validación, errores y reintentos.
-5. **1.4 Tabla editable:** visualizar ítem, producto, subproducto, descripción, cant, unidad, días y observación; editar, agregar, eliminar y confirmar filas. Conservar el JSON original y las ediciones humanas por separado. Guardar el resultado asociado al TDR y evento.
+3. **1.2 Carga de PDF:** registrar o seleccionar contratante y proyecto con los datos mínimos, validar y guardar el PDF en almacenamiento privado local.
+4. **1.3 Extracción IA:** botón «Procesar TDR con IA», prompt versionado, esquema de salida con ficha del proyecto y matriz de entregables (§8), interfaz común de IA con al menos un adaptador de proveedor y selección configurable de proveedor/modelo, gestión de estados, validación, errores y reintentos.
+5. **1.4 Tabla editable:** visualizar ítem (1.1, 1.2…), rubro, producto, subproducto, descripción, cant, unidad, días, observación y responsable; editar, agregar, eliminar y confirmar filas; asignar un responsable por ítem con una lista desplegable de trabajadores activos; editar y confirmar la ficha del proyecto. Conservar el JSON original y las ediciones humanas por separado. Guardar el resultado asociado al TDR y proyecto.
 6. **1.5 Validación:** probar distintos formatos y PDF extensos, casos de tablas entre páginas, cantidades inciertas, reprocesamiento, seguridad y precisión. Acordar criterios cuantitativos con la empresa antes del piloto.
 
-**Entrega:** cargar un PDF, pulsar un botón, generar el desglose, revisarlo y persistirlo en PostgreSQL. No implementar precios, responsables, informes, pagos, fotografías ni sincronización en esta fase. Un prototipo sin autenticación solo puede ejecutarse localmente y con datos autorizados.
+**Entrega:** en Operación › Requerimiento, cargar un PDF, pulsar un botón, generar la ficha y el desglose, revisarlos, asignar un responsable por ítem y persistirlos en PostgreSQL. No implementar precios, tareas ni seguimiento de responsables, informes, pagos, fotografías ni sincronización en esta fase. Un prototipo sin autenticación solo puede ejecutarse localmente y con datos autorizados.
 
 ### Fase 2 — Presupuestos y estimación de precios unitarios
 
@@ -324,7 +400,7 @@ Subfases ordenadas:
 
 ### Fase 3 — Multiusuario, roles y permisos
 
-- Autenticación, usuarios, permisos configurables por módulo y acción, alcance por evento/cliente y acceso de mínimo privilegio. Proponer roles iniciales (administrador, coordinador, financiero, operativo y, si se aprueba, cliente).
+- Autenticación, usuarios, permisos configurables por módulo y acción, alcance por empresa/proyecto/contratante y acceso de mínimo privilegio. Proponer roles iniciales (administrador, coordinador, financiero, operativo y, si se aprueba, cliente).
 - Aplicar autorización en el backend y en la base de datos cuando corresponda, no solo ocultar vistas. Separar datos de costos, márgenes, pagos y comprobantes internos de lo que se muestra al cliente.
 - Definir auditoría de acciones, identidad de responsables, desactivación de usuarios y revocación de permisos. Antes de cualquier piloto remoto o uso de datos reales fuera del entorno local, debe existir autenticación y autorización efectivas; adelantar este requisito si resulta necesario.
 - Diseñar permisos de módulos aún no implementados sin desarrollar dichos módulos anticipadamente. Definir estrategia local compatible con futura Supabase Auth y RLS, pendiente de aprobación.
@@ -333,8 +409,8 @@ Subfases ordenadas:
 
 ### Fase 4 — Responsables y tareas
 
-- Asociar requerimientos confirmados a uno o varios empleados responsables, con fechas objetivo, prioridad, estado, notas y seguimiento. Acordar cardinalidad, roles autorizados y estados de tareas.
-- Mostrar tareas pendientes por empleado y evento; registrar cambios, reasignaciones y cumplimiento. No confundir estado de tarea con estado de extracción ni de informe.
+- Parte de la Fase 1: un responsable por ítem, elegido de la lista de trabajadores. Esta fase amplía esa asignación con varios responsables o equipo de apoyo si se aprueba, fechas objetivo, prioridad, estado, notas y seguimiento. Acordar cardinalidad, roles autorizados y estados de tareas.
+- Mostrar tareas pendientes por trabajador y proyecto; registrar cambios, reasignaciones y cumplimiento. No confundir estado de tarea con estado de extracción ni de informe.
 
 **Entrega:** responsables asignados y seguimiento de ejecución por requerimiento.
 
@@ -343,13 +419,13 @@ Subfases ordenadas:
 - Generar un informe con requerimientos, cantidades, precios finales y presupuesto de oferta revisado. El formato de exportación y el canal de acceso del cliente se acuerdan antes de implementar.
 - Proponer estados: borrador/en construcción, revisión interna, aprobado internamente, en revisión por el cliente, aprobado por el cliente, rechazado/requiere correcciones y cancelado. Los nombres y transiciones requieren aprobación. Se consolida la repetición de «En revisión por el cliente» en un único estado.
 - Las transiciones deben tener permisos, actor, fecha y observaciones. Una versión enviada debe conservarse como instantánea; si se rechaza, crear una nueva versión vinculada, sin eliminar la rechazada. No aprobar automáticamente un informe por acción de IA.
-- Definir qué estados permiten editar, cancelar, enviar, aprobar y solicitar correcciones. El cliente solo ve la versión y datos autorizados de su evento; excluir costos internos, márgenes y comprobantes de proveedor salvo autorización explícita.
+- Definir qué estados permiten editar, cancelar, enviar, aprobar y solicitar correcciones. El cliente solo ve la versión y datos autorizados de su proyecto; excluir costos internos, márgenes y comprobantes de proveedor salvo autorización explícita.
 
 **Entrega:** informe versionado, revisión interna, revisión del cliente, aprobación o rechazo, corrección y cancelación con historial.
 
 ### Fase 6 — Proveedores, facturas, pagos y rentabilidad
 
-- Registrar proveedores, facturas/documentos de soporte y costos vinculados a las especificaciones del evento. Permitir varios costos/proveedores por requerimiento si se aprueba. Evitar doble contabilización de paquetes y componentes.
+- Registrar proveedores, facturas/documentos de soporte y costos vinculados a las especificaciones del proyecto. Permitir varios costos/proveedores por requerimiento si se aprueba. Evitar doble contabilización de paquetes y componentes.
 - Separar compromisos/costos, pagos efectivos y precios de venta. Registrar anticipos, cuotas y liquidación completa como movimientos independientes; permitir pagos parciales y asignación de pagos a obligaciones según el modelo aprobado.
 - Registrar fecha, monto, método (transferencia, cheque o efectivo), referencia y fotografía/documento del comprobante. Exigir recibo para efectivo; permitir registrar otros comprobantes y su estado de verificación. Calcular saldo pendiente y controlar duplicados y sobrepagos.
 - Costo total de la empresa = suma de costos de las especificaciones, sin sumar nuevamente los pagos. Ingreso previsto = suma de importes finales a cobrar al cliente. Utilidad bruta = ingreso previsto menos costo total; margen bruto = utilidad / ingreso previsto si este es positivo. Distinguir valores estimados, comprometidos, reales y pagados. Acordar impuestos y redondeos.
@@ -359,7 +435,7 @@ Subfases ordenadas:
 
 ### Fase 7 — Evidencias de cumplimiento
 
-- Subir múltiples fotografías y archivos autorizados por requerimiento/evento con metadatos (fecha, responsable, descripción, referencia y visibilidad).
+- Subir múltiples fotografías y archivos autorizados por requerimiento/proyecto con metadatos (fecha, responsable, descripción, referencia y visibilidad).
 - Permitir revisión de evidencias y publicación autorizada para que el cliente verifique el cumplimiento. Las evidencias de pago son privadas por defecto y no se publican automáticamente al cliente.
 - Usar almacenamiento de objetos privado; PostgreSQL almacena referencias. Gestionar acceso, validación de archivos, eliminación, respaldo y trazabilidad.
 
