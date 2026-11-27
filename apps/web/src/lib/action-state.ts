@@ -9,6 +9,9 @@ export interface ActionState {
 
 export const IDLE: ActionState = { status: 'idle' };
 
+/** Resultado de una edición en línea (un solo dato que se guarda al cambiarlo). */
+export type InlineResult = { ok: true } | { ok: false; message: string };
+
 export function formValues(formData: FormData): Record<string, string> {
   const values: Record<string, string> = {};
   for (const [key, value] of formData.entries()) {

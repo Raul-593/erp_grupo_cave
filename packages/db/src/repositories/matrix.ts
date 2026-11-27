@@ -53,6 +53,8 @@ export interface MatrixItem {
   supplierKind: SupplierKind | null;
   plannedCost: string | null;
   contractStatus: ContractStatus | null;
+  /** Versión de la planificación del ítem; null si todavía no tiene. */
+  planVersion: number | null;
   activityCount: number;
   // Abastecimiento
   orderId: string | null;
@@ -61,9 +63,14 @@ export interface MatrixItem {
   paidAmount: string | null;
   balance: string | null;
   paymentStatus: ItemPaymentStatus;
+  paymentWorkerId: string | null;
   paymentWorkerName: string | null;
+  /** Versión de la línea de la orden; null si el ítem no está en ninguna orden. */
+  lineVersion: number | null;
   // Ejecución
   mountStatus: MountStatus | null;
+  /** Versión del registro de ejecución del ítem; null si todavía no tiene. */
+  executionVersion: number | null;
   evidenceCount: number;
 }
 
@@ -73,7 +80,7 @@ export async function listMatrixItems(db: Queryable, extractionId: string): Prom
             i.cant, i.unidad, i.dias, i.observacion,
             w.id AS "workerId", w.full_name AS "workerName",
             s.id AS "supplierId", s.name AS "supplierName", s.kind AS "supplierKind",
-            p.planned_cost AS "plannedCost", p.contract_status AS "contractStatus",
+            p.planned_cost AS "plannedCost", p.contract_status AS "contractStatus", p.version AS "planVersion",
             (SELECT count(*)::int FROM activity_items ai WHERE ai.tdr_item_id = i.id) AS "activityCount",
             o.id AS "orderId", o.code AS "orderCode", l.amount AS "orderAmount", l.paid_amount AS "paidAmount",
             l.amount - l.paid_amount AS balance,
@@ -81,8 +88,8 @@ export async function listMatrixItems(db: Queryable, extractionId: string): Prom
                  WHEN l.paid_amount = 0 THEN 'unpaid'
                  WHEN l.paid_amount < l.amount THEN 'partial'
                  ELSE 'paid' END AS "paymentStatus",
-            pw.full_name AS "paymentWorkerName",
-            e.mount_status AS "mountStatus",
+            pw.id AS "paymentWorkerId", pw.full_name AS "paymentWorkerName", l.version AS "lineVersion",
+            e.mount_status AS "mountStatus", e.version AS "executionVersion",
             (SELECT count(*)::int FROM item_evidences v WHERE v.tdr_item_id = i.id) AS "evidenceCount"
        FROM tdr_items i
        LEFT JOIN tdr_item_assignments a ON a.tdr_item_id = i.id

@@ -1,6 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { DEMO_PROVIDER, getLatestExtraction, listClients, listDocumentsByProject, listWorkers } from '@erp/db';
+import {
+  DEMO_PROVIDER,
+  getLatestExtraction,
+  listClients,
+  listDocumentsByProject,
+  listQuoteLines,
+  listQuoteRequests,
+  listWorkers,
+} from '@erp/db';
 import { ProjectValueForm } from '@/components/forms/ProjectValueForm';
 import { AutoRefresh } from '@/components/requerimiento/AutoRefresh';
 import { DeleteDocumentButton } from '@/components/requerimiento/DeleteDocumentButton';
@@ -11,12 +19,15 @@ import { TdrUploader } from '@/components/requerimiento/TdrUploader';
 import { Card, EmptyState, Note, PageHeader, Pill } from '@/components/ui';
 import { validateExtractionOutput, type ExtractionOutput } from '@/domain/tdr-extraction/contract';
 import { TDR_INPUT_ID } from '@/lib/constants';
-import { formatBytes, formatDateTime } from '@/lib/format';
+import { ResponsibleSelect } from '@/components/operacion/inline';
+import { QuotesCards } from '@/components/requerimiento/QuotesCards';
+import { formatBytes, formatDateTime, formatQuantity } from '@/lib/format';
 import { itemCodes } from '@/lib/numbering';
 import { projectValueToForm } from '@/lib/project-value';
 import { getCurrentProject } from '@/server/current-project';
 import { db } from '@/server/db';
 import { aiStatus, sweepInterruptedExtractions } from '@/server/extraction-runner';
+import { loadMatrixView } from '@/server/matrix';
 import { maxTdrBytes } from '@/server/storage';
 
 export const metadata: Metadata = { title: 'Requerimiento' };
@@ -33,6 +44,22 @@ const MATRIX_COLUMNS = [
   { label: 'Observaciones' },
   { label: 'Responsable' },
 ];
+
+/** Fila de la matriz lista para mostrar, venga de la propuesta de la IA o de la matriz confirmada. */
+interface MatrixDisplayRow {
+  key: string;
+  code: string;
+  rubro: string;
+  producto: string;
+  subproducto: string | null;
+  descripcion: string;
+  cant: string;
+  unidad: string | null;
+  dias: string;
+  observacion: string | null;
+  responsible: string | null;
+  responsibleId: string | null;
+}
 
 const SUBTITLE =
   'El punto de partida del proyecto: aquí se carga el TDR y queda convertido en la ficha y la matriz de entregables, con un responsable por ítem.';
@@ -73,9 +100,49 @@ export default async function RequerimientoPage() {
     proposal = parsed.ok ? parsed.output : null;
   }
   const codes = proposal ? itemCodes(proposal.items) : [];
+
+  // Matriz confirmada vigente del proyecto (con responsable por ítem) y sus cotizaciones.
+  const confirmed = await loadMatrixView(project.id);
+  const [quoteRequests, quoteLines] = confirmed
+    ? await Promise.all([listQuoteRequests(db(), project.id), listQuoteLines(db(), project.id)])
+    : [[], []];
+  // Una propuesta todavía sin confirmar del último documento tiene prioridad en la tarjeta de la matriz.
+  const showConfirmed = confirmed !== null && extraction?.status !== 'processed';
   // Datos de demostración (AGENTS.md §2): se rotulan como tales, nunca como propuesta de la IA.
-  const demo = extraction?.provider === DEMO_PROVIDER;
-  const rubroCount = proposal ? new Set(proposal.items.map((row) => row.rubro.trim().toLowerCase())).size : 0;
+  const demo = showConfirmed ? confirmed.demo : extraction?.provider === DEMO_PROVIDER;
+  const rows: MatrixDisplayRow[] = showConfirmed
+    ? confirmed.items.map((item) => ({
+        key: item.id,
+        code: item.code,
+        rubro: item.rubro,
+        producto: item.producto,
+        subproducto: item.subproducto,
+        descripcion: item.descripcion,
+        cant: formatQuantity(item.cant),
+        unidad: item.unidad,
+        dias: formatQuantity(item.dias),
+        observacion: item.observacion,
+        responsible: item.workerName,
+        responsibleId: item.workerId,
+      }))
+    : (proposal?.items ?? []).map((row, index) => ({
+        key: `${row.item}-${index}`,
+        code: codes[index] ?? '',
+        rubro: row.rubro,
+        producto: row.producto,
+        subproducto: row.subproducto,
+        descripcion: row.descripcion,
+        cant: row.cant === null ? '—' : row.cant.toLocaleString('es-EC'),
+        unidad: row.unidad,
+        dias: row.dias === null ? '—' : row.dias.toLocaleString('es-EC'),
+        observacion: row.observacion,
+        responsible: null,
+        responsibleId: null,
+      }));
+  const hasMatrix = showConfirmed || proposal !== null;
+  const rubroCount = new Set(rows.map((row) => row.rubro.trim().toLowerCase())).size;
+  const unassigned = showConfirmed ? confirmed.totals.unassignedCount : 0;
+  const matrixKind = demo ? 'datos de demostración' : showConfirmed ? 'matriz confirmada' : 'propuesta IA';
   const processDisabledReason = !ai.ready
     ? 'Configura la IA en .env (ver el aviso de la tarjeta).'
     : extractionActive
@@ -175,9 +242,10 @@ export default async function RequerimientoPage() {
           startDate: project.startDate,
           endDate: project.endDate,
           contractAdministrator: project.contractAdministrator,
+          companyName: project.companyName,
         }}
         clients={clients.map(({ id, name, taxId }) => ({ id, name, taxId }))}
-        scope={proposal ? `${proposal.items.length} ítems en ${rubroCount} rubros (${demo ? 'datos de demostración' : 'propuesta IA'})` : 'Sin matriz todavía'}
+        scope={hasMatrix ? `${rows.length} ítems en ${rubroCount} rubros (${matrixKind})` : 'Sin matriz todavía'}
         documentLabel={latest ? latest.originalFilename : 'Sin cargar'}
       />
 
@@ -201,11 +269,11 @@ export default async function RequerimientoPage() {
               </tr>
             </thead>
             <tbody>
-              {proposal && proposal.items.length > 0 ? (
-                proposal.items.map((row, index) => (
-                  <tr key={`${row.item}-${index}`} className={demo ? 'align-top' : 'align-top text-vi'}>
+              {rows.length > 0 ? (
+                rows.map((row) => (
+                  <tr key={row.key} className={showConfirmed || demo ? 'align-top' : 'align-top text-vi'}>
                     <td>
-                      <b className="font-semibold tabular-nums">{codes[index]}</b>
+                      <b className="font-semibold tabular-nums">{row.code}</b>
                     </td>
                     <td>
                       <b className="font-semibold">{row.producto}</b>
@@ -213,23 +281,33 @@ export default async function RequerimientoPage() {
                     </td>
                     <td>{row.subproducto ?? '—'}</td>
                     <td className="min-w-[220px] text-ink2">{row.descripcion || '—'}</td>
-                    <td className="num">{row.cant === null ? '—' : row.cant.toLocaleString('es-EC')}</td>
+                    <td className="num">{row.cant}</td>
                     <td>{row.unidad ?? '—'}</td>
-                    <td className="num">{row.dias === null ? '—' : row.dias.toLocaleString('es-EC')}</td>
+                    <td className="num">{row.dias}</td>
                     <td className="min-w-[200px] text-[11.5px] text-mut">{row.observacion ?? '—'}</td>
-                    <td>
-                      <select className="field" disabled aria-label="Responsable" title="Se asigna en la etapa D (tabla editable)">
-                        <option>—</option>
-                      </select>
+                    <td className="whitespace-nowrap">
+                      {showConfirmed ? (
+                        <ResponsibleSelect
+                          itemId={row.key}
+                          itemLabel={row.code}
+                          workerId={row.responsibleId}
+                          workerName={row.responsible}
+                          workers={workers.map((worker) => ({ id: worker.id, name: worker.fullName }))}
+                        />
+                      ) : (
+                        <select className="field" disabled aria-label="Responsable" title="Se asigna en la etapa D (tabla editable)">
+                          <option>—</option>
+                        </select>
+                      )}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td colSpan={MATRIX_COLUMNS.length} className="p-0">
-                    <EmptyState icon="▦" title={proposal ? 'La IA no encontró requerimientos' : 'Sin ítems todavía'}>
+                    <EmptyState icon="▦" title={hasMatrix ? 'La IA no encontró requerimientos' : 'Sin ítems todavía'}>
                       <p>
-                        {proposal
+                        {hasMatrix
                           ? 'El documento se procesó y no se identificaron bienes, servicios ni personal. Revisa la observación de la ficha propuesta.'
                           : 'La matriz se llenará al procesar el TDR con IA, agrupada por rubro (1.1, 1.2…). También podrás agregar, editar y eliminar ítems, y elegir un responsable para cada uno.'}
                       </p>
@@ -242,10 +320,13 @@ export default async function RequerimientoPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-4 py-2.5 text-[11.5px] text-mut">
           <span>
-            {proposal ? `${proposal.items.length} ítems · ${rubroCount} rubros · ` : '0 ítems · 0 rubros'}
-            {proposal ? (
+            {hasMatrix ? `${rows.length} ítems · ${rubroCount} rubros · ` : '0 ítems · 0 rubros'}
+            {showConfirmed ? `${unassigned} sin responsable · ` : null}
+            {hasMatrix ? (
               demo ? (
                 <b className="font-semibold text-wa">datos de demostración (ilustrativos), matriz confirmada</b>
+              ) : showConfirmed ? (
+                <b className="font-semibold text-ok">matriz confirmada</b>
               ) : (
                 <b className="font-semibold text-vi">◆ propuesta IA, solo lectura hasta la etapa D</b>
               )
@@ -268,6 +349,10 @@ export default async function RequerimientoPage() {
           </span>
         </div>
       </Card>
+
+      {confirmed && quoteRequests.length > 0 ? (
+        <QuotesCards requests={quoteRequests} lines={quoteLines} items={confirmed.items} currency={project.currency} />
+      ) : null}
 
       <Note>
         Los valores que proponga la IA se mostrarán en <b className="text-vi">violeta</b> con el rótulo «Propuesta IA» hasta que

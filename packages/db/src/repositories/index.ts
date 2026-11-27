@@ -35,16 +35,43 @@ export {
   type MatrixTotals,
 } from './matrix.ts';
 export {
-  listSuppliers,
   listActivities,
   listPayments,
   listPreEventChecks,
   listQuoteRequests,
   listQuoteLines,
-  type Supplier,
   type Activity,
   type Payment,
   type PreEventCheck,
   type QuoteRequest,
   type QuoteLine,
 } from './operations.ts';
+export { listSuppliers, getSupplier, createSupplier, updateSupplier, type Supplier, type SupplierInput } from './suppliers.ts';
+export { getItemProjectId, setItemResponsible, saveItemPlan, type ItemPlanInput } from './item-edits.ts';
+export { updateActivity, setItemMountStatus, setPreEventCheckResult, type ActivityPatch } from './status-edits.ts';
+export {
+  BusinessRuleError,
+  listPurchaseOrders,
+  getPurchaseOrderProjectId,
+  createPurchaseOrder,
+  setItemOrder,
+  updateOrderLine,
+  getPayment,
+  createPayment,
+  updatePayment,
+  deletePayment,
+  type PurchaseOrder,
+  type OrderLinePatch,
+  type PaymentInput,
+  type PaymentDetail,
+} from './procurement-edits.ts';
+export {
+  listItemEvidences,
+  getEvidenceFile,
+  findEvidenceByHash,
+  createEvidence,
+  deleteEvidence,
+  type Evidence,
+  type EvidenceFile,
+  type EvidenceInput,
+} from './evidences.ts';

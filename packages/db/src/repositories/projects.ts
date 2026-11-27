@@ -8,6 +8,7 @@ export interface Project {
   clientName: string;
   clientTaxId: string | null;
   companyId: string | null;
+  companyName: string | null;
   startDate: string | null;
   endDate: string | null;
   notes: string | null;
@@ -60,14 +61,15 @@ const EDITABLE_COLUMNS: Readonly<Record<keyof ProjectInput, string>> = {
 
 const SELECT = `
   SELECT p.id, p.name, p.client_id AS "clientId", c.name AS "clientName", c.tax_id AS "clientTaxId",
-         p.company_id AS "companyId", p.start_date AS "startDate", p.end_date AS "endDate", p.notes,
+         p.company_id AS "companyId", co.name AS "companyName", p.start_date AS "startDate", p.end_date AS "endDate", p.notes,
          p.process_code AS "processCode", p.purpose, p.contract_amount AS "contractAmount", p.currency,
          p.amount_includes_vat AS "amountIncludesVat", p.venues, p.term_text AS "termText",
          p.contract_administrator AS "contractAdministrator", p.ficha_extraction_id AS "fichaExtractionId",
          (SELECT count(*)::int FROM tdr_documents d WHERE d.project_id = p.id) AS "documentCount",
          p.version, p.created_at AS "createdAt"
     FROM projects p
-    JOIN clients c ON c.id = p.client_id`;
+    JOIN clients c ON c.id = p.client_id
+    LEFT JOIN companies co ON co.id = p.company_id`;
 
 export async function listProjects(db: Queryable): Promise<Project[]> {
   const { rows } = await db.query<Project>(`${SELECT} ORDER BY p.created_at DESC, p.id`);

@@ -25,6 +25,8 @@ export interface FichaProject {
   startDate: string | null;
   endDate: string | null;
   contractAdministrator: string | null;
+  /** Empresa del holding que ejecuta el proyecto; todavía sin interfaz para editarla. */
+  companyName?: string | null;
 }
 
 function toFormValues(project: FichaProject): Record<string, string> {
@@ -95,6 +97,7 @@ export function FichaCard({
             { label: 'Sedes', value: project.venues.length ? project.venues.join(' · ') : '—' },
             { label: 'Plazo de entrega', value: term || '—' },
             { label: 'Administrador del contrato', value: dash(project.contractAdministrator) },
+            { label: 'Empresa ejecutora', value: dash(project.companyName ?? null) },
             { label: 'Alcance', value: scope },
             { label: 'Documento TDR', value: documentLabel },
           ]}

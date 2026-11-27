@@ -1,5 +1,5 @@
 /**
- * Consultas de solo lectura de Planificación, Abastecimiento, Ejecución y cotizaciones
+ * Consultas de lectura de Planificación, Abastecimiento, Ejecución y cotizaciones
  * (tablas de la migración 0007). `date` y `numeric` llegan como texto exacto.
  */
 import type {
@@ -11,21 +11,6 @@ import type {
   SupplierKind,
 } from '../domain.ts';
 import type { Queryable } from './shared.ts';
-
-export interface Supplier {
-  id: string;
-  name: string;
-  kind: SupplierKind;
-  taxId: string | null;
-  active: boolean;
-}
-
-export async function listSuppliers(db: Queryable): Promise<Supplier[]> {
-  const { rows } = await db.query<Supplier>(
-    `SELECT id, name, kind, tax_id AS "taxId", active FROM suppliers ORDER BY active DESC, lower(name), id`,
-  );
-  return rows;
-}
 
 export interface Activity {
   id: string;
@@ -41,6 +26,7 @@ export interface Activity {
   dependsOnName: string | null;
   /** Ítems vinculados, en el orden de la matriz. */
   itemIds: string[];
+  version: number;
 }
 
 export async function listActivities(db: Queryable, projectId: string): Promise<Activity[]> {
@@ -51,7 +37,7 @@ export async function listActivities(db: Queryable, projectId: string): Promise<
             COALESCE((SELECT array_agg(ai.tdr_item_id ORDER BY i.item_number)
                         FROM activity_items ai
                         JOIN tdr_items i ON i.id = ai.tdr_item_id
-                       WHERE ai.activity_id = a.id), '{}') AS "itemIds"
+                       WHERE ai.activity_id = a.id), '{}') AS "itemIds", a.version
        FROM activities a
        LEFT JOIN workers w ON w.id = a.worker_id
        LEFT JOIN activities dep ON dep.id = a.depends_on_activity_id
@@ -71,11 +57,12 @@ export interface Payment {
   method: PaymentMethod;
   amount: string;
   support: PaymentSupport;
+  version: number;
 }
 
 export async function listPayments(db: Queryable, projectId: string): Promise<Payment[]> {
   const { rows } = await db.query<Payment>(
-    `SELECT p.id, o.id AS "orderId", o.code AS "orderCode", p.paid_on AS "paidOn", p.concept, p.method, p.amount, p.support
+    `SELECT p.id, o.id AS "orderId", o.code AS "orderCode", p.paid_on AS "paidOn", p.concept, p.method, p.amount, p.support, p.version
        FROM payments p
        JOIN purchase_orders o ON o.id = p.purchase_order_id
       WHERE o.project_id = $1
@@ -91,11 +78,12 @@ export interface PreEventCheck {
   workerName: string | null;
   dueAt: Date | null;
   result: CheckResult;
+  version: number;
 }
 
 export async function listPreEventChecks(db: Queryable, projectId: string): Promise<PreEventCheck[]> {
   const { rows } = await db.query<PreEventCheck>(
-    `SELECT c.id, c.description, w.full_name AS "workerName", c.due_at AS "dueAt", c.result
+    `SELECT c.id, c.description, w.full_name AS "workerName", c.due_at AS "dueAt", c.result, c.version
        FROM pre_event_checks c
        LEFT JOIN workers w ON w.id = c.worker_id
       WHERE c.project_id = $1

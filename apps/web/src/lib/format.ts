@@ -40,6 +40,20 @@ export function formatAmount(amount: string | null, currency: string | null): st
   return `${symbol}${grouped}${cents}`;
 }
 
+/** Día y mes de una fecha operativa: «14 nov». */
+export function formatDayMonth(value: string | null): string {
+  return formatDate(value).replace(/\s+(de\s+)?\d{4}$/, '');
+}
+
+/** Cantidad exacta (texto decimal) sin ceros sobrantes y con separadores es-EC: «1200.0000» → «1.200». */
+export function formatQuantity(value: string | null): string {
+  if (value === null) return '—';
+  const [int = '0', frac = ''] = value.split('.');
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const decimals = frac.replace(/0+$/, '');
+  return decimals ? `${grouped},${decimals}` : grouped;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toLocaleString('es-EC', { maximumFractionDigits: 0 })} KB`;

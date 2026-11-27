@@ -3,6 +3,15 @@
  * datos listos para los repositorios y devuelve errores por campo en español.
  */
 import { z } from 'zod';
+import {
+  ACTIVITY_STATUSES,
+  CHECK_RESULTS,
+  CONTRACT_STATUSES,
+  MOUNT_STATUSES,
+  PAYMENT_METHODS,
+  PAYMENT_SUPPORTS,
+  SUPPLIER_KINDS,
+} from '@erp/db';
 import { NEW_CLIENT } from '@/lib/constants';
 import { longTextOrNull, parseDecimal, parseList, textOrNull } from '@/lib/parse';
 
@@ -144,6 +153,127 @@ export const workerFormSchema = z.object({
   notes: optionalLongText(2000, 'Notas'),
   active: field().transform((v) => v === 'on' || v === 'true'),
 });
+
+/** Importe opcional con dos decimales como máximo, en texto decimal exacto (o null). */
+const optionalAmount = (label: string) =>
+  field()
+    .transform(parseDecimal)
+    .refine((v) => v !== undefined, `${label}: escribe un número, por ejemplo 8.400,50.`)
+    .refine((v) => v == null || !/\.\d{3,}$/.test(v), `${label}: máximo dos decimales.`)
+    .refine((v) => v == null || v.split('.')[0]!.length <= 12, `${label} demasiado grande.`)
+    .transform((v) => v ?? null);
+
+/** Lista desplegable opcional de registros: vacío equivale a «ninguno». */
+const optionalId = (label: string) =>
+  field()
+    .transform((v) => (v.trim() === '' ? null : v.trim()))
+    .refine((v) => v === null || z.string().uuid().safeParse(v).success, `${label} no válido.`);
+
+/** Alta y edición de un proveedor (pestaña Proveedores). */
+export const supplierFormSchema = z.object({
+  name: requiredText(200, 'El nombre del proveedor'),
+  kind: z.enum(SUPPLIER_KINDS, 'Selecciona el tipo de proveedor.'),
+  taxId: optionalText(20, 'RUC').refine((v) => v === null || TAX_ID.test(v), 'RUC o cédula: solo letras, dígitos o guion (5 a 20).'),
+  notes: optionalLongText(2000, 'Notas'),
+  active: field().transform((v) => v === 'on' || v === 'true'),
+});
+
+/** Cambio de responsable de un ítem: el responsable que se veía y el nuevo (vacío = sin asignar). */
+export const responsibleChangeSchema = z.object({
+  itemId: uuid('Ítem'),
+  expectedWorkerId: optionalId('Responsable'),
+  workerId: optionalId('Responsable'),
+});
+
+/** Un campo de la planificación de un ítem; `version` vacía significa que aún no tiene plan. */
+const planTarget = {
+  itemId: uuid('Ítem'),
+  version: field().transform((v, ctx) => {
+    if (v.trim() === '') return null;
+    const parsed = version.safeParse(v);
+    if (!parsed.success) {
+      ctx.addIssue({ code: 'custom', message: 'Versión no válida.' });
+      return z.NEVER;
+    }
+    return parsed.data;
+  }),
+};
+export const planChangeSchema = z.discriminatedUnion('field', [
+  z.object({ ...planTarget, field: z.literal('supplierId'), value: optionalId('Proveedor') }),
+  z.object({ ...planTarget, field: z.literal('plannedCost'), value: optionalAmount('Costo') }),
+  z.object({ ...planTarget, field: z.literal('contractStatus'), value: z.enum(CONTRACT_STATUSES, 'Estado de contrato no válido.') }),
+]);
+
+/** Estado (vacío = sin registrar) o responsable (vacío = sin responsable) de una actividad. */
+export const activityChangeSchema = z.discriminatedUnion('field', [
+  z.object({
+    id: uuid('Actividad'),
+    version,
+    field: z.literal('status'),
+    value: z.enum(['', ...ACTIVITY_STATUSES], 'Estado no válido.').transform((v) => (v === '' ? null : v)),
+  }),
+  z.object({ id: uuid('Actividad'), version, field: z.literal('workerId'), value: optionalId('Responsable') }),
+]);
+
+/** Estado de montaje de un ítem; `version` vacía significa que aún no tiene registro de ejecución. */
+export const mountChangeSchema = z.object({
+  itemId: planTarget.itemId,
+  version: planTarget.version,
+  value: z.enum(MOUNT_STATUSES, 'Estado de montaje no válido.'),
+});
+
+/** Resultado de un control del checklist previo. */
+export const checkChangeSchema = z.object({
+  id: uuid('Control'),
+  version,
+  value: z.enum(CHECK_RESULTS, 'Resultado no válido.'),
+});
+
+/** Importe obligatorio (cero incluido), en texto decimal exacto. */
+const requiredAmount = (label: string) =>
+  optionalAmount(label)
+    .refine((v): v is string => v !== null, `${label}: escribe un valor.`)
+    .transform((v) => v as string);
+
+/** Alta de una orden de compra en un proyecto. */
+export const orderFormSchema = z.object({
+  projectId: uuid('Proyecto'),
+  code: requiredText(40, 'El código de la orden'),
+});
+
+/** Orden de un ítem (vacío = sin orden); `version` vacía significa que el ítem no estaba en ninguna orden. */
+export const itemOrderChangeSchema = z.object({
+  itemId: planTarget.itemId,
+  version: planTarget.version,
+  orderId: optionalId('Orden'),
+});
+
+const lineTarget = { itemId: uuid('Ítem'), version };
+/** Un campo de la línea de una orden: monto, pagado o responsable de pago. */
+export const orderLineChangeSchema = z.discriminatedUnion('field', [
+  z.object({ ...lineTarget, field: z.literal('amount'), value: requiredAmount('Costo') }),
+  z.object({ ...lineTarget, field: z.literal('paidAmount'), value: requiredAmount('Pagado') }),
+  z.object({ ...lineTarget, field: z.literal('paymentWorkerId'), value: optionalId('Responsable de pago') }),
+]);
+
+/** Alta y edición de un pago contra una orden. */
+export const paymentFormSchema = z.object({
+  orderId: z.string({ error: 'Selecciona la orden.' }).uuid('Selecciona la orden.'),
+  paidOn: field()
+    .transform(textOrNull)
+    .refine((v): v is string => v !== null, 'La fecha es obligatoria.')
+    .refine((v) => v === null || (DATE.test(v) && !Number.isNaN(Date.parse(v))), 'Fecha no válida.')
+    .transform((v) => v as string),
+  concept: requiredText(200, 'El concepto'),
+  method: z.enum(PAYMENT_METHODS, 'Selecciona la forma de pago.'),
+  amount: requiredAmount('Monto').refine((v) => Number(v) > 0, 'Monto: debe ser mayor que cero.'),
+  support: z.enum(PAYMENT_SUPPORTS, 'Selecciona el respaldo.'),
+});
+
+/** Primer mensaje de error de un resultado fallido de zod, para ediciones de un solo campo. */
+export function firstIssue(error: z.ZodError): string {
+  return error.issues[0]?.message ?? 'Dato no válido.';
+}
 
 export const idSchema = (label: string) => uuid(label);
 export const versionSchema = version;

@@ -9,7 +9,11 @@ import { BoxIcon, MenuIcon, ThemeIcon } from './icons';
 const TABS = [
   { href: '/operacion/proyectos', label: 'Proyectos' },
   { href: '/operacion/requerimiento', label: 'Requerimiento' },
+  { href: '/operacion/planificacion', label: 'Planificación' },
+  { href: '/operacion/abastecimiento', label: 'Abastecimiento' },
+  { href: '/operacion/ejecucion', label: 'Ejecución' },
   { href: '/operacion/trabajadores', label: 'Trabajadores' },
+  { href: '/operacion/proveedores', label: 'Proveedores' },
 ];
 
 export interface ShellProject {
