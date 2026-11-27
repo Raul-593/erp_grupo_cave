@@ -20,6 +20,7 @@ const png = (text?: string) => bytes([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 
 const webp = (text?: string) => bytes([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50], text);
 
 let root: string;
+const UPLOADER = '7d0b1f8e-5a1c-4a52-9a43-2c5b0e7f1a11';
 let created: EvidenceInput[];
 let deps: EvidenceUploadDeps;
 
@@ -47,7 +48,7 @@ afterEach(async () => {
 
 const stored = async () => (await readdir(root, { recursive: true })).filter((entry) => /\.(jpg|png|webp)$/.test(entry));
 const upload = (name: string, data: Uint8Array, itemId = ITEM, description: string | null = null) =>
-  uploadEvidence(deps, { projectId: PROJECT, itemId, name, bytes: data, description });
+  uploadEvidence(deps, { projectId: PROJECT, itemId, name, bytes: data, description, uploadedBy: UPLOADER });
 
 describe('detección del tipo de imagen', () => {
   it('reconoce JPEG, PNG y WebP por su firma y nada más', () => {
@@ -75,7 +76,7 @@ describe('carga de fotografías', () => {
     expect(result).toEqual({ ok: true, evidenceId: 'foto-1', filename: 'escenario montado.png' });
     const [row] = created;
     expect(row?.storageKey).toMatch(new RegExp(`^evidencias/${PROJECT}/${ITEM}/[0-9a-f-]{36}\\.png$`));
-    expect(row).toMatchObject({ mimeType: 'image/png', sizeBytes: data.length, description: 'Vista frontal', storageProvider: 'local' });
+    expect(row).toMatchObject({ mimeType: 'image/png', sizeBytes: data.length, description: 'Vista frontal', storageProvider: 'local', uploadedBy: UPLOADER });
     expect(row?.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(await readFile(path.join(root, ...row!.storageKey.split('/')))).toEqual(Buffer.from(data));
   });

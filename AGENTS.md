@@ -20,6 +20,7 @@ Los TDR son documentos PDF proporcionados por diferentes clientes. Su estructura
 | Requerimiento | TDR cargado y su matriz de entregables | `tdr_documents`, `tdr_extractions`, `tdr_items` |
 | Rubro / producto / subproducto | Tres niveles de la matriz de entregables (ver §8) | columnas de `tdr_items` |
 | Responsable | Trabajador asignado a un ítem de la matriz | `workers` y `tdr_item_assignments` |
+| Usuario | Persona que entra al sistema, con un tipo de usuario: superusuario, empleado de campo, contabilidad o proveedor (§2, «Usuarios y permisos») | `app_users` |
 
 La empresa todavía no se gestiona en la interfaz: el esquema queda preparado para incorporarla sin reescribir el núcleo. «Evento» se sigue usando para la ceremonia o actividad física que se produce, no para la entidad principal.
 
@@ -43,8 +44,8 @@ La extracción no debe generar precios ni presupuestos en esta fase. El monto de
 ### Fuera del alcance de la Fase 1 (incluido en fases posteriores de V1 cuando corresponda)
 
 - Estimación de precios unitarios mediante IA, presupuestos y ofertas económicas.
-- Tareas, fechas y seguimiento de responsables (más allá de un responsable por ítem), permisos multiusuario e informes con revisión y aprobación.
-- Los demás módulos del prototipo: cierre, finanzas, administración, portal del proveedor, comercial, marketing y talento; las versiones o adendas del requerimiento; la edición de la matriz confirmada (subfase 1.4) y la de cotizaciones. Planificación, abastecimiento y ejecución sí se consultan y se editan dentro de lo indicado en «Vista previa con datos de demostración».
+- Tareas, fechas y seguimiento de responsables (más allá de un responsable por ítem), permisos configurables desde pantalla e informes con revisión y aprobación. Los usuarios y sus cuatro tipos sí están adelantados (ver «Usuarios y permisos»).
+- Los demás módulos del prototipo: cierre, finanzas, administración (salvo Usuarios), portal del proveedor (salvo su página «en preparación»), comercial, marketing y talento; las versiones o adendas del requerimiento; la edición de la matriz confirmada (subfase 1.4) y la de cotizaciones. Planificación, abastecimiento y ejecución sí se consultan y se editan dentro de lo indicado en «Vista previa con datos de demostración».
 - Operación sin conexión y sincronización de evidencias.
 - Gestión de proveedores, inventario, compras, facturación y contabilidad.
 - Generación de reportes fotográficos, y revisión o publicación de evidencias al cliente. La carga de fotografías por ítem desde Ejecución sí está adelantada (ver «Vista previa con datos de demostración»).
@@ -60,9 +61,27 @@ Mientras no haya clave de API, el usuario pidió seguir avanzando con los datos 
 - Los datos que el prototipo muestra en Operación › Requerimiento, Planificación, Abastecimiento y Ejecución se cargan **solo en el proyecto 1 del entorno local**, mediante un script idempotente (no una migración). Entran como un documento de demostración con una extracción de proveedor `demo`, ya confirmada, y se rotulan «Datos de demostración» en pantalla. No son datos de un TDR real ni referencia de precios.
 - El archivo con esos datos (nombres de personas y montos) no se versiona; el script sí.
 - Planificación, Abastecimiento y Ejecución leen de la base y los indicadores se calculan siempre a partir de las filas guardadas; no se guardan totales literales del prototipo.
-- **Edición desde las pantallas (decisión del usuario, 2026-11-27):** responsable por ítem; proveedor, costo y contrato por ítem; catálogo mínimo de proveedores; estados de actividades, de montaje y del checklist previo; órdenes y pagos. Lo pagado por ítem no se escribe: es la suma de lo que los pagos reparten entre los ítems de su orden (decisión del usuario, 2026-11-27; `PLAN.md`, «reparto de pagos»). Un pago puede quedar repartido solo en parte, a un ítem no se le paga más que su costo (primero se sube el costo) y un pago o un ítem con reparto no cambia de orden. Cada cambio se valida en el servidor y usa control de versión. No hay historial de cambios hasta que exista autenticación (Fase 3).
+- **Edición desde las pantallas (decisión del usuario, 2026-11-27):** responsable por ítem; proveedor, costo y contrato por ítem; catálogo mínimo de proveedores; estados de actividades, de montaje y del checklist previo; órdenes y pagos. Lo pagado por ítem no se escribe: es la suma de lo que los pagos reparten entre los ítems de su orden (decisión del usuario, 2026-11-27; `PLAN.md`, «reparto de pagos»). Un pago puede quedar repartido solo en parte, a un ítem no se le paga más que su costo (primero se sube el costo) y un pago o un ítem con reparto no cambia de orden. Cada cambio se valida en el servidor, usa control de versión y queda en el historial (`audit_log`) con el usuario que lo hizo.
 - Desde Ejecución se pueden **subir, ver y eliminar fotografías por ítem** (adelanto parcial de la Fase 7). Las fotografías del prototipo no existen como archivos y no se fabrican.
 - El modelo de órdenes, pagos y costos es provisional y se rediseña en la Fase 6.
+
+### Usuarios y permisos (decisión del usuario, 2026-11-27)
+
+Adelanto de la Fase 3 (migración `0009`). Cada usuario tiene **un** tipo:
+
+| Tipo (en pantalla) | Clave | Qué puede hacer |
+| --- | --- | --- |
+| Superusuario | `admin` | Todo el sistema y la gestión de usuarios (Administración › Usuarios). Puede haber varios; siempre queda al menos uno activo |
+| Empleado de campo | `field` | Vinculado a su trabajador. Ve solo los proyectos e ítems donde es el responsable (`tdr_item_assignments`); cambia **proveedor y costo del ítem** en Planificación, sube fotografías en sus ítems y elimina solo las que él subió. No ve órdenes, pagos, cotizaciones, documentos TDR ni catálogos |
+| Contabilidad | `accounting` | Ve todos los proyectos, documentos, órdenes, pagos y cotizaciones **sin cambiarlos**. Aprobará costos cuando exista su módulo (permiso `costs.approve` reservado, sin pantalla) |
+| Proveedor | `supplier` | Vinculado a su proveedor. Solo ve la página «Portal del proveedor: en preparación»; responderá sus cotizaciones cuando exista el portal (permiso `quotes.respond` reservado) |
+
+- Los permisos por tipo están en el código (`apps/web/src/domain/access/permissions.ts`), versionados y con pruebas; no se configuran desde pantalla todavía.
+- **El servidor decide:** toda acción de servidor y toda ruta de API llama a `authorize(permiso, { itemId | projectId })` antes de tocar datos (una prueba falla si alguna no lo hace). Ocultar controles en pantalla es solo ayuda visual.
+- Cada cambio se registra en `audit_log` dentro de la misma transacción: quién, cuándo, acción, registro y valores enviados. El historial no se modifica ni se borra.
+- Los usuarios no se borran: se desactivan.
+- **Ingreso en local:** «Entrar como…» sin contraseña (adaptador `dev`), que solo funciona con la base local, desde `127.0.0.1` y fuera de un hosting. El ingreso con correo y contraseña llega con Supabase Auth (`PLAN.md`, parte S).
+- Los usuarios de `erp` son **de ejemplo** (creados con `pnpm db:users:example` a partir de trabajadores y proveedores existentes); los reales se cargan en Supabase.
 
 ## 3. Decisiones técnicas
 
@@ -80,7 +99,8 @@ Mientras no haya clave de API, el usuario pidió seguir avanzando con los datos 
 | Backend | Node.js |
 | Lenguaje y gestor de paquetes | TypeScript; pnpm (workspace con `packages/*` y `apps/*`) |
 | ORM o herramienta de migraciones | Aprobado: migraciones SQL con node-pg-migrate y driver `pg` (`packages/db`) |
-| Autenticación | Pendiente de aprobación; considerar Supabase Auth para producción |
+| Autenticación | Interfaz común `AuthProvider` (`apps/web/src/integrations/auth/`), elegida con `AUTH_PROVIDER`. Aprobado en local: adaptador `dev` (ingreso sin contraseña, solo en este equipo). Propuesto para producción: Supabase Auth (`PLAN.md`, parte S, pendiente de aprobación) |
+| Autorización | Aprobado: permisos por tipo de usuario en el código y comprobados en el servidor (§2, «Usuarios y permisos»). RLS por usuario en la base: pendiente (`PLAN.md`, S-D7) |
 
 Las decisiones previstas no autorizan crear cuentas, contratar servicios, desplegar aplicaciones ni modificar infraestructura externa.
 
@@ -170,8 +190,8 @@ No acceder a ningún proveedor de IA directamente desde el navegador. No concent
 
 La interfaz reproduce el estilo del prototipo `CAVE-ERP-v3`. Se toma su diseño, no sus datos: los nombres, montos y proyectos del prototipo son ilustrativos y no se cargan como datos ni como semillas, con la única excepción de la demostración del proyecto 1 (§2, «Vista previa con datos de demostración»).
 
-- **Estructura:** barra lateral oscura fija (logo «CAVE ERP», grupos de navegación en mayúsculas, ítem activo con borde azul a la izquierda); barra superior blanca con selector de proyecto; subnavegación por pestañas en mayúsculas; contenido con ancho máximo de 1420 px. En pantallas de menos de 880 px la barra lateral se oculta tras un botón de menú.
-- **Navegación en Fase 1:** solo se muestra lo implementado: Operación › Proyectos (alta y selección mínima), Operación › Requerimiento, los catálogos mínimos de trabajadores y de proveedores, y Planificación, Abastecimiento y Ejecución (§2). Los módulos restantes del prototipo (Cierre, Finanzas, Administración, Portal proveedor, Comercial, Marketing, Talento, Mi día) no aparecen hasta su fase. El selector «Empresa» se incorpora cuando se implemente `companies`.
+- **Estructura:** barra lateral oscura fija (logo «CAVE ERP», grupos de navegación en mayúsculas, ítem activo con borde azul a la izquierda); barra superior blanca con selector de proyecto, nombre y tipo del usuario y «Cerrar sesión»; subnavegación por pestañas en mayúsculas; contenido con ancho máximo de 1420 px. En pantallas de menos de 880 px la barra lateral se oculta tras un botón de menú.
+- **Navegación en Fase 1:** solo se muestra lo implementado y lo que el tipo de usuario puede abrir (`apps/web/src/lib/navigation.ts`): Operación › Proyectos (alta y selección mínima), Operación › Requerimiento, los catálogos mínimos de trabajadores y de proveedores, Planificación, Abastecimiento y Ejecución (§2), Administración › Usuarios (solo superusuario) y la página del portal del proveedor (solo proveedor). Los módulos restantes del prototipo (Cierre, Finanzas, el resto de Administración y del Portal proveedor, Comercial, Marketing, Talento, Mi día) no aparecen hasta su fase. El empleado de campo ve un aviso «Tus ítems» en las pantallas filtradas a su alcance. El selector «Empresa» se incorpora cuando se implemente `companies`.
 - **Pantalla Requerimiento:** encabezado con título en mayúsculas, subtítulo y acciones («+ Ítem», «Cargar TDR» como botón principal); tarjeta «Ficha del proyecto» en cuadrícula de etiqueta/valor; tarjeta «Matriz de entregables» con las columnas Ítem, Producto (con el rubro debajo en texto secundario), Subproducto, Descripción, Cant., Unidad, Días, Observaciones y **Responsable** (lista desplegable). Pie con el total de ítems y rubros. Las tarjetas de cotizaciones y comparativo se muestran en modo lectura (§2); las versiones/adendas quedan para fases posteriores.
 - **Tokens:** se conservan los colores del prototipo como variables CSS (modo claro y oscuro): navegación `#0E1D33`, fondo `#F5F7FA`, tarjeta `#FFFFFF`, texto `#0F1A2A`, líneas `#E4E9F0`, azul primario `#1F5FCC`, éxito `#0E7A52`, advertencia `#9A6400`, error `#B4302A` y violeta `#5B4BB7` para todo lo que proviene de la IA. Los estados se muestran como etiquetas («pill») de color.
 - **Tipografía:** Inter 400/500/600 con cifras tabulares; títulos y rótulos en mayúsculas con espaciado amplio; tamaño base 13,5 px.
@@ -187,7 +207,7 @@ La interfaz reproduce el estilo del prototipo `CAVE-ERP-v3`. Se toma su diseño,
 - Preferir UUID para identificadores de entidades, `timestamptz` para instantes y `numeric` para cantidades decimales. No utilizar coma flotante para futuros importes monetarios.
 - Almacenar instantes de forma consistente y mostrar fechas y horas operativas en `America/Guayaquil` cuando corresponda.
 - Utilizar SQL y extensiones compatibles con el PostgreSQL de Supabase. No asumir disponibilidad de privilegios de superusuario ni versiones idénticas de extensiones.
-- No depender de esquemas exclusivos de Supabase (`auth`, `storage`) en el prototipo local. La estrategia de vinculación de usuarios y RLS debe definirse antes de la migración.
+- No depender de esquemas exclusivos de Supabase (`auth`, `storage`) en el prototipo local. Los usuarios se vincularán a Supabase Auth con `app_users.auth_subject` (sin clave foránea al esquema `auth`); la estrategia de RLS propuesta está en `PLAN.md` (S-D7) y debe aprobarse antes de la migración.
 - Usar transacciones para operaciones que deban completarse de forma atómica, incluida la confirmación de un desglose.
 - No borrar tablas, reiniciar bases de datos, ejecutar `DROP`, `TRUNCATE` ni migraciones destructivas sin autorización y respaldo apropiado.
 - La migración futura deberá validar versiones, extensiones, esquema, datos, restricciones, índices, permisos, RLS y archivos. Probar primero en un entorno no productivo y disponer de un plan de reversión.
@@ -195,7 +215,7 @@ La interfaz reproduce el estilo del prototipo `CAVE-ERP-v3`. Se toma su diseño,
 
 ### Modelo de datos
 
-Migraciones `0001`–`0008` aplicadas en `erp` y `erp_test`. `0001`–`0005` (subfase 1.1) crearon `clients`, `events`, `tdr_documents`, `tdr_extractions` y `tdr_items`; `0006` aplicó la terminología de §1 (renombró `events` a `projects` y añadió empresas, trabajadores y responsables). Las migraciones aplicadas no se editan: todo cambio va en una migración nueva.
+Migraciones `0001`–`0009` aplicadas en `erp` y `erp_test`. `0001`–`0005` (subfase 1.1) crearon `clients`, `events`, `tdr_documents`, `tdr_extractions` y `tdr_items`; `0006` aplicó la terminología de §1 (renombró `events` a `projects` y añadió empresas, trabajadores y responsables). Las migraciones aplicadas no se editan: todo cambio va en una migración nueva.
 
 | Entidad | Responsabilidad | Estado |
 | --- | --- | --- |
@@ -212,9 +232,11 @@ Tablas de la migración `0007` (vista previa de §2; modelo financiero provision
 
 La migración `0008` (`PLAN.md`, «reparto de pagos») añade `payment_allocations` (reparto de cada pago entre los ítems de su misma orden). Desde entonces `purchase_order_lines.paid_amount` es un valor calculado, la suma de esos repartos: lo mantiene un trigger y ni la aplicación ni un script lo escriben directamente. Sigue siendo parte del modelo provisional que se rediseña en la Fase 6.
 
+La migración `0009` (§2, «Usuarios y permisos») añade `app_users` (usuarios: nombre, correo opcional en minúsculas y único, tipo, vínculo con `workers` —obligatorio para el empleado de campo, uno por trabajador— o con `suppliers` —obligatorio y exclusivo del proveedor—, `auth_subject` para el futuro id de Supabase Auth, activo y último ingreso), `audit_log` (historial de solo agregar: un trigger impide modificarlo, borrarlo o vaciarlo) e `item_evidences.uploaded_by` (vacío en las fotografías anteriores). La base impide borrar usuarios y dejar sin superusuario activo.
+
 Relaciones: una empresa puede tener varios proyectos; un contratante puede tener varios proyectos; un proyecto puede tener varios TDR; cada TDR puede tener varios intentos de extracción; cada extracción puede tener múltiples ítems; cada ítem tiene como máximo un responsable.
 
-La asignación del responsable vive en una tabla separada de `tdr_items` porque los ítems de una extracción confirmada son inmutables, mientras que el responsable debe poder cambiarse después de confirmar. Los trabajadores no son usuarios del sistema: su vínculo con cuentas de usuario se define en la Fase 3. Un trabajador con asignaciones no se borra; se desactiva.
+La asignación del responsable vive en una tabla separada de `tdr_items` porque los ítems de una extracción confirmada son inmutables, mientras que el responsable debe poder cambiarse después de confirmar. Un trabajador puede tener como máximo un usuario (`app_users.worker_id`); el empleado de campo trabaja sobre los ítems de su trabajador, de modo que reasignar un ítem cambia de inmediato quién puede verlo. Un trabajador con asignaciones o con usuario no se borra; se desactiva.
 
 Política vigente: como máximo una extracción confirmada por documento; reprocesar crea un nuevo intento y nunca modifica el confirmado.
 
@@ -358,11 +380,11 @@ El resultado de la IA, sea cual sea el proveedor, es una propuesta de extracció
 ## 10. Seguridad y configuración
 
 - Mantener secretos únicamente en el backend o en un gestor de secretos. Excluir `.env`, archivos privados, dumps reales y documentos de clientes del control de versiones.
-- Incluir un `.env.example` sin valores sensibles cuando se apruebe la configuración inicial. Variables previstas: `DATABASE_URL`, `DATABASE_SCHEMA`, `TEST_DATABASE_SCHEMA`, proveedor y modelo de IA por defecto (`AI_PROVIDER`, `AI_MODEL`), una clave por proveedor habilitado (por ejemplo `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`) y configuración del almacenamiento local. Los nombres definitivos se fijan en la subfase 1.3.
+- Mantener `.env.example` sin valores sensibles. Variables vigentes: `DATABASE_URL`, `DATABASE_SCHEMA`, `TEST_DATABASE_SCHEMA`, proveedor y modelo de IA (`AI_PROVIDER`, `AI_MODEL`), una clave por proveedor habilitado (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`), límites de IA, configuración del almacenamiento local y `AUTH_PROVIDER` (`dev` por omisión).
 - No usar claves de producción en el entorno local. No exponer credenciales de PostgreSQL, de ningún proveedor de IA ni claves privilegiadas de Supabase al frontend.
 - Validar datos en el servidor y utilizar consultas parametrizadas o un ORM con parámetros seguros.
 - Definir autenticación y autorización antes de permitir uso multiusuario o exposición externa. Aplicar mínimo privilegio y validar acceso a la empresa, contratante, proyecto y documento en cada operación pertinente.
-- El prototipo sin autenticación, si se aprueba, debe ejecutarse únicamente de forma local y con datos autorizados.
+- El ingreso de desarrollo sin contraseña (adaptador `dev`) solo se ejecuta de forma local y con datos autorizados; se niega a funcionar con una base remota, desde otra dirección o en un hosting. Antes de publicar la aplicación debe existir un ingreso con credenciales (`PLAN.md`, parte S).
 - No enviar datos a terceros distintos de los proveedores aprobados. Cada proveedor de IA se aprueba por separado: verificar autorización para procesar TDR reales y sus condiciones de privacidad y retención antes de enviarle datos de clientes. Para probar modelos sin esa verificación, usar únicamente documentos sintéticos o anonimizados.
 - No incluir secretos ni detalles internos del proveedor en mensajes de error visibles al usuario.
 
@@ -379,7 +401,7 @@ Casos mínimos:
 - Respuesta JSON inválida, incompleta, rechazada o sin requerimientos.
 - Timeout, error de API, doble clic, reintento y fallo de persistencia.
 - Edición y confirmación de filas; reprocesamiento sin pérdida del resultado confirmado.
-- Acceso a documentos y resultados según permisos cuando se implemente autenticación.
+- Acceso a documentos, resultados, fotografías y acciones según el tipo de usuario y su alcance (permitido y rechazado), y prueba de cobertura que exige `authorize` en cada acción y ruta.
 
 El MVP se considerará aceptable cuando se pueda cargar un TDR, procesarlo, visualizar la ficha del proyecto y la matriz de entregables (rubro, producto, subproducto, descripción, cant., unidad, días y observación), asignar un responsable por ítem, corregir el resultado y persistirlo asociado al proyecto; los fallos deben mostrarse de forma controlada y no crear resultados confirmados incorrectos.
 
@@ -414,6 +436,8 @@ Subfases ordenadas:
 **Entrega:** presupuesto editable, sugerencias IA, precios finales revisables y totales deterministas.
 
 ### Fase 3 — Multiusuario, roles y permisos
+
+Adelantado (2026-11-27, §2 «Usuarios y permisos»): usuarios, cuatro tipos (superusuario, campo, contabilidad, proveedor), autorización en el servidor, alcance del empleado de campo por sus ítems, historial de cambios e ingreso local de desarrollo. Pendiente: ingreso con credenciales (Supabase Auth), permisos configurables desde pantalla, alcance por empresa y RLS por usuario.
 
 - Autenticación, usuarios, permisos configurables por módulo y acción, alcance por empresa/proyecto/contratante y acceso de mínimo privilegio. Proponer roles iniciales (administrador, coordinador, financiero, operativo y, si se aprueba, cliente).
 - Aplicar autorización en el backend y en la base de datos cuando corresponda, no solo ocultar vistas. Separar datos de costos, márgenes, pagos y comprobantes internos de lo que se muestra al cliente.

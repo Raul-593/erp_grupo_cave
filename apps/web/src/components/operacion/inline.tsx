@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type ReactNode } from 'react';
 import type { ActivityStatus, CheckResult, ContractStatus, MountStatus } from '@erp/db';
+import { useCan } from '@/components/access';
 import type { InlineResult } from '@/lib/action-state';
 import { formatAmount } from '@/lib/format';
 import { ACTIVITY_STATUS, CHECK_RESULT, CONTRACT_STATUS, MOUNT_STATUS } from '@/lib/labels';
@@ -74,6 +75,8 @@ export function ResponsibleSelect({
 }) {
   const { pending, error, save } = useInlineSave<'worker'>();
   const [draft, setDraft] = useState('');
+  const canAssign = useCan('items.assign');
+  if (!canAssign) return <span>{workerName ?? 'Sin asignar'}</span>;
   return (
     <>
       <select
@@ -147,6 +150,9 @@ export function PlanCells({
   };
   const shown = (field: string, saved: string) => (pending && draft.field === field ? draft.value : saved);
   const savedCost = amountText(plannedCost);
+  // Proveedor y costo: superusuario y el empleado de campo responsable; contrato: superusuario.
+  const canCost = useCan('items.plan_cost');
+  const canContract = useCan('items.plan_contract');
 
   return (
     <>
@@ -154,69 +160,85 @@ export function PlanCells({
         <ResponsibleSelect itemId={itemId} itemLabel={itemLabel} workerId={workerId} workerName={workerName} workers={workers} />
       </td>
       <td>
-        <select
-          className={SELECT_CLASS}
-          aria-label={`Proveedor del ítem ${itemLabel}`}
-          value={shown('supplierId', supplierId ?? '')}
-          disabled={pending}
-          onChange={(event) => send('supplierId', event.target.value)}
-        >
-          <option value="">Sin proveedor</option>
-          {withCurrent(suppliers, supplierId, supplierName, 'inactivo').map((supplier) => (
-            <option key={supplier.id} value={supplier.id}>
-              {supplier.name}
-            </option>
-          ))}
-        </select>
+        {canCost ? (
+          <select
+            className={SELECT_CLASS}
+            aria-label={`Proveedor del ítem ${itemLabel}`}
+            value={shown('supplierId', supplierId ?? '')}
+            disabled={pending}
+            onChange={(event) => send('supplierId', event.target.value)}
+          >
+            <option value="">Sin proveedor</option>
+            {withCurrent(suppliers, supplierId, supplierName, 'inactivo').map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          (supplierName ?? 'Sin proveedor')
+        )}
         <InlineError message={error?.field === 'supplierId' ? error.message : undefined} />
       </td>
       <td className="num">
-        <span className="inline-flex items-center gap-1">
-          <span className="text-mut" aria-hidden>
-            {currencySymbol}
+        {canCost ? (
+          <span className="inline-flex items-center gap-1">
+            <span className="text-mut" aria-hidden>
+              {currencySymbol}
+            </span>
+            <input
+              // La clave reinicia el campo cuando llega un costo distinto o se rechaza lo escrito.
+              key={`${savedCost}:${rejections}`}
+              className="field w-[104px] !py-[5px] text-right tabular-nums disabled:opacity-60"
+              aria-label={`Costo asignado del ítem ${itemLabel}`}
+              inputMode="decimal"
+              autoComplete="off"
+              defaultValue={savedCost}
+              placeholder="—"
+              disabled={pending}
+              aria-invalid={error?.field === 'plannedCost' ? true : undefined}
+              onBlur={(event) => {
+                const next = event.target.value.trim();
+                if (next !== savedCost) send('plannedCost', next);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur();
+                if (event.key === 'Escape') {
+                  event.currentTarget.value = savedCost;
+                  event.currentTarget.blur();
+                }
+              }}
+            />
           </span>
-          <input
-            // La clave reinicia el campo cuando llega un costo distinto o se rechaza lo escrito.
-            key={`${savedCost}:${rejections}`}
-            className="field w-[104px] !py-[5px] text-right tabular-nums disabled:opacity-60"
-            aria-label={`Costo asignado del ítem ${itemLabel}`}
-            inputMode="decimal"
-            autoComplete="off"
-            defaultValue={savedCost}
-            placeholder="—"
-            disabled={pending}
-            aria-invalid={error?.field === 'plannedCost' ? true : undefined}
-            onBlur={(event) => {
-              const next = event.target.value.trim();
-              if (next !== savedCost) send('plannedCost', next);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') event.currentTarget.blur();
-              if (event.key === 'Escape') {
-                event.currentTarget.value = savedCost;
-                event.currentTarget.blur();
-              }
-            }}
-          />
-        </span>
+        ) : plannedCost === null ? (
+          '—'
+        ) : (
+          `${currencySymbol} ${savedCost}`
+        )}
         <InlineError message={error?.field === 'plannedCost' ? error.message : undefined} />
       </td>
       <td className="text-mut">{activities}</td>
       <td>
-        <select
-          className={`${SELECT_CLASS} !min-w-[112px]`}
-          aria-label={`Contrato del ítem ${itemLabel}`}
-          value={shown('contractStatus', contractStatus ?? '')}
-          disabled={pending}
-          onChange={(event) => send('contractStatus', event.target.value)}
-        >
-          {contractStatus === null ? <option value="">Sin definir</option> : null}
-          {CONTRACT_OPTIONS.map(([value, [label]]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+        {canContract ? (
+          <select
+            className={`${SELECT_CLASS} !min-w-[112px]`}
+            aria-label={`Contrato del ítem ${itemLabel}`}
+            value={shown('contractStatus', contractStatus ?? '')}
+            disabled={pending}
+            onChange={(event) => send('contractStatus', event.target.value)}
+          >
+            {contractStatus === null ? <option value="">Sin definir</option> : null}
+            {CONTRACT_OPTIONS.map(([value, [label]]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        ) : contractStatus === null ? (
+          'Sin definir'
+        ) : (
+          CONTRACT_STATUS[contractStatus][0]
+        )}
         <InlineError message={error?.field === 'contractStatus' ? error.message : undefined} />
       </td>
     </>
@@ -258,12 +280,15 @@ export function ActivityCells({
     save(field, () => updateActivityField({ id, version: String(version), field, value }));
   };
   const shown = (field: string, saved: string) => (pending && draft.field === field ? draft.value : saved);
+  const canEdit = useCan('schedule.write');
 
   return (
     <>
       <td>
         {wholeTeam ? (
           'Equipo completo'
+        ) : !canEdit ? (
+          (workerName ?? 'Sin asignar')
         ) : (
           <>
             <select
@@ -286,20 +311,26 @@ export function ActivityCells({
       </td>
       {children}
       <td>
-        <select
-          className={`${SELECT_CLASS} !min-w-[124px]`}
-          aria-label={`Estado de la actividad ${name}`}
-          value={shown('status', status ?? '')}
-          disabled={pending}
-          onChange={(event) => send('status', event.target.value)}
-        >
-          <option value="">Sin registrar</option>
-          {ACTIVITY_OPTIONS.map(([value, [label]]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+        {canEdit ? (
+          <select
+            className={`${SELECT_CLASS} !min-w-[124px]`}
+            aria-label={`Estado de la actividad ${name}`}
+            value={shown('status', status ?? '')}
+            disabled={pending}
+            onChange={(event) => send('status', event.target.value)}
+          >
+            <option value="">Sin registrar</option>
+            {ACTIVITY_OPTIONS.map(([value, [label]]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        ) : status === null ? (
+          'Sin registrar'
+        ) : (
+          ACTIVITY_STATUS[status][0]
+        )}
         <InlineError message={error?.field === 'status' ? error.message : undefined} />
       </td>
     </>
@@ -322,6 +353,9 @@ function SavingSelect({
 }) {
   const { pending, error, save } = useInlineSave<'value'>();
   const [draft, setDraft] = useState('');
+  // Montaje y checklist: solo quien puede cambiar el cronograma; los demás ven el valor.
+  const canEdit = useCan('schedule.write');
+  if (!canEdit) return <span>{options.find(([optionValue]) => optionValue === value)?.[1] ?? value}</span>;
   return (
     <>
       <select

@@ -22,6 +22,7 @@ import {
   PgErrorCode,
   QUOTE_STATUSES,
   SUPPLIER_KINDS,
+  USER_ROLES,
 } from '../src/index.ts';
 
 const config = loadDbConfig('test');
@@ -117,7 +118,7 @@ describe('estructura', () => {
     expect(rows[0]?.schema).toBe(config.schema);
   });
 
-  it('tiene las tablas de las migraciones 0001-0008', async () => {
+  it('tiene las tablas de las migraciones 0001-0009', async () => {
     const { rows } = await client.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = $1 AND tablename <> 'pgmigrations' ORDER BY 1`,
       [config.schema],
@@ -125,6 +126,8 @@ describe('estructura', () => {
     expect(rows.map((row) => row.tablename)).toEqual([
       'activities',
       'activity_items',
+      'app_users',
+      'audit_log',
       'clients',
       'companies',
       'item_evidences',
@@ -154,6 +157,7 @@ describe('estructura', () => {
     );
     expect(rows.map((row) => row.proname)).toEqual([
       'check_activity_dependency',
+      'check_app_user_change',
       'check_assignment_worker_active',
       'check_item_same_project',
       'check_line_paid_amount',
@@ -162,6 +166,7 @@ describe('estructura', () => {
       'check_project_ficha_extraction',
       'protect_tdr_extraction',
       'protect_tdr_items',
+      'reject_audit_log_change',
       'require_confirmed_item',
       'set_row_metadata',
       'sync_line_paid_amount',
@@ -192,6 +197,7 @@ describe('estructura', () => {
       ['item_execution_mount_status_valid', MOUNT_STATUSES],
       ['pre_event_checks_result_valid', CHECK_RESULTS],
       ['item_evidences_mime_type_image', EVIDENCE_MIME_TYPES],
+      ['app_users_role_valid', USER_ROLES],
     ];
     for (const [constraint, values] of pairs) {
       const def = await definition(constraint);
@@ -859,5 +865,76 @@ describe('reparto de pagos (0008)', () => {
     await client.query(`DELETE FROM payment_allocations WHERE payment_id = $1`, [s.payment]);
     expect(await failureCode(`DELETE FROM purchase_order_lines WHERE id = $1`, [s.lineA])).toBeUndefined();
     expect(await failureCode(`DELETE FROM payments WHERE id = $1`, [s.payment])).toBeUndefined();
+  });
+});
+
+describe('usuarios y auditoría (0009)', () => {
+  let counter = 0;
+  /** Ejecuta una sentencia que debe fallar y devuelve el nombre de la regla incumplida. */
+  async function brokenRule(sql: string, params: unknown[] = []): Promise<string | undefined> {
+    const savepoint = `usuario_${++counter}`;
+    await client.query(`SAVEPOINT ${savepoint}`);
+    try {
+      await client.query(sql, params);
+    } catch (error) {
+      await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+      const constraint = (error as { constraint?: string }).constraint;
+      return constraint ?? `sin-restriccion:${getPgErrorCode(error) ?? '?'}`;
+    }
+    await client.query(`RELEASE SAVEPOINT ${savepoint}`);
+    return undefined;
+  }
+
+  const USER = `INSERT INTO app_users (full_name, role, email, worker_id, supplier_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
+
+  it('exige el vínculo que corresponde a cada rol y un correo normalizado y único', async () => {
+    const worker = await insertId(`INSERT INTO workers (full_name) VALUES ('Trabajador sintético') RETURNING id`, []);
+    const supplier = await insertId(`INSERT INTO suppliers (name, kind) VALUES ('Proveedor sintético', 'external') RETURNING id`, []);
+
+    expect(await brokenRule(USER, ['Campo', 'field', null, null, null])).toBe('app_users_field_requires_worker');
+    expect(await brokenRule(USER, ['Proveedor', 'supplier', null, null, null])).toBe('app_users_supplier_link');
+    expect(await brokenRule(USER, ['Contable', 'accounting', null, null, supplier])).toBe('app_users_supplier_link');
+    expect(await brokenRule(USER, ['Proveedor', 'supplier', null, worker, supplier])).toBe('app_users_supplier_no_worker');
+    expect(await brokenRule(USER, ['Otro', 'guest', null, null, null])).toBe('app_users_role_valid');
+    expect(await brokenRule(USER, ['  ', 'admin', null, null, null])).toBe('app_users_full_name_not_blank');
+    expect(await brokenRule(USER, ['Mayúsculas', 'admin', 'Persona@Ejemplo.test', null, null])).toBe('app_users_email_format');
+    expect(await brokenRule(USER, ['Sin arroba', 'admin', 'persona.ejemplo.test', null, null])).toBe('app_users_email_format');
+
+    await client.query(USER, ['Campo', 'field', 'campo@ejemplo.test', worker, null]);
+    await client.query(USER, ['Proveedor A', 'supplier', null, null, supplier]);
+    // Varios usuarios pueden pertenecer al mismo proveedor.
+    expect(await brokenRule(USER, ['Proveedor B', 'supplier', null, null, supplier])).toBeUndefined();
+    expect(await brokenRule(USER, ['Repetido', 'admin', 'campo@ejemplo.test', null, null])).toBe('app_users_email_key');
+    expect(await brokenRule(USER, ['Mismo trabajador', 'accounting', null, worker, null])).toBe('app_users_worker_id_key');
+    expect(await failureCode(`DELETE FROM workers WHERE id = $1`, [worker])).toBe(PgErrorCode.restrictViolation);
+  });
+
+  it('no borra usuarios y deja siempre un superusuario activo', async () => {
+    const admin = await insertId(USER, ['Admin uno', 'admin', null, null, null]);
+    const accounting = await insertId(USER, ['Contable', 'accounting', null, null, null]);
+
+    expect(await brokenRule(`UPDATE app_users SET active = false WHERE id = $1`, [admin])).toBe('app_users_last_admin');
+    expect(await brokenRule(`UPDATE app_users SET role = 'accounting' WHERE id = $1`, [admin])).toBe('app_users_last_admin');
+    expect(await brokenRule(`DELETE FROM app_users WHERE id = $1`, [accounting])).toBe('app_users_no_delete');
+    expect(await brokenRule(`UPDATE app_users SET active = false WHERE id = $1`, [accounting])).toBeUndefined();
+
+    const second = await insertId(USER, ['Admin dos', 'admin', null, null, null]);
+    expect(await brokenRule(`UPDATE app_users SET active = false WHERE id = $1`, [admin])).toBeUndefined();
+    expect(await brokenRule(`UPDATE app_users SET active = false WHERE id = $1`, [second])).toBe('app_users_last_admin');
+    // Un superusuario desactivado puede reactivarse y cambiar de rol sin afectar la regla.
+    expect(await brokenRule(`UPDATE app_users SET active = true WHERE id = $1`, [admin])).toBeUndefined();
+    expect(await brokenRule(`UPDATE app_users SET role = 'accounting' WHERE id = $1`, [second])).toBeUndefined();
+  });
+
+  it('el historial de cambios solo admite agregar filas', async () => {
+    const admin = await insertId(USER, ['Admin', 'admin', null, null, null]);
+    const AUDIT = `INSERT INTO audit_log (user_id, action, entity, entity_id, details) VALUES ($1, $2, $3, $4, $5)`;
+    expect(await brokenRule(AUDIT, [admin, 'item_plan.update', 'item_plans', randomUUID(), { field: 'plannedCost' }])).toBeUndefined();
+    expect(await brokenRule(AUDIT, [admin, 'Mal formato', 'item_plans', null, {}])).toBe('audit_log_action_format');
+    expect(await brokenRule(AUDIT, [admin, 'item_plan.update', 'item_plans', null, '[]'])).toBe('audit_log_details_object');
+    expect(await brokenRule(`UPDATE audit_log SET action = 'otro.cambio'`)).toBe('audit_log_append_only');
+    expect(await brokenRule(`DELETE FROM audit_log`)).toBe('audit_log_append_only');
+    expect(await brokenRule(`TRUNCATE audit_log`)).toBe('audit_log_append_only');
+    expect(await brokenRule(`UPDATE app_users SET active = false WHERE id = $1`, [admin])).toBe('app_users_last_admin');
   });
 });

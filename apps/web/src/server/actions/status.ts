@@ -1,8 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getItemProjectId, setItemMountStatus, setPreEventCheckResult, updateActivity } from '@erp/db';
+import { getItemProjectId, setItemMountStatus, setPreEventCheckResult, updateActivity, withTransaction } from '@erp/db';
 import type { InlineResult } from '@/lib/action-state';
+import { audit, authorize } from '../auth';
 import { db } from '../db';
 import { toUserMessage } from '../errors';
 import { activityChangeSchema, checkChangeSchema, firstIssue, mountChangeSchema } from '../schemas';
@@ -12,8 +13,13 @@ export async function updateActivityField(input: unknown): Promise<InlineResult>
   const parsed = activityChangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
   const change = parsed.data;
+  const auth = await authorize('schedule.write');
+  if (!auth.ok) return auth;
   try {
-    await updateActivity(db(), change.id, change.version, { [change.field]: change.value });
+    await withTransaction(db(), async (tx) => {
+      await updateActivity(tx, change.id, change.version, { [change.field]: change.value });
+      await audit(tx, auth.user, 'activity.update', 'activities', change.id, { [change.field]: change.value });
+    });
   } catch (error) {
     return { ok: false, message: toUserMessage(error) };
   }
@@ -26,9 +32,14 @@ export async function updateMountStatus(input: unknown): Promise<InlineResult> {
   const parsed = mountChangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
   const { itemId, version, value } = parsed.data;
+  const auth = await authorize('schedule.write', { itemId });
+  if (!auth.ok) return auth;
   try {
     if ((await getItemProjectId(db(), itemId)) === null) return { ok: false, message: 'El ítem ya no existe. Recarga la página.' };
-    await setItemMountStatus(db(), itemId, version, value);
+    await withTransaction(db(), async (tx) => {
+      await setItemMountStatus(tx, itemId, version, value);
+      await audit(tx, auth.user, 'item_execution.update', 'tdr_items', itemId, { mountStatus: value });
+    });
   } catch (error) {
     return { ok: false, message: toUserMessage(error) };
   }
@@ -41,8 +52,13 @@ export async function updateCheckResult(input: unknown): Promise<InlineResult> {
   const parsed = checkChangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
   const { id, version, value } = parsed.data;
+  const auth = await authorize('schedule.write');
+  if (!auth.ok) return auth;
   try {
-    await setPreEventCheckResult(db(), id, version, value);
+    await withTransaction(db(), async (tx) => {
+      await setPreEventCheckResult(tx, id, version, value);
+      await audit(tx, auth.user, 'pre_event_check.update', 'pre_event_checks', id, { result: value });
+    });
   } catch (error) {
     return { ok: false, message: toUserMessage(error) };
   }

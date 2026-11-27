@@ -14,6 +14,7 @@
     "db:status": "pnpm --filter @erp/db run db:status",
     "db:seed:demo": "pnpm --filter web run db:seed:demo",
     "db:convert:paid": "pnpm --filter web run db:convert:paid",
+    "db:users:example": "pnpm --filter @erp/db run db:users:example",
     "test:db": "pnpm --filter @erp/db run test",
     "typecheck": "pnpm -r run typecheck",
     "dev": "pnpm --filter web dev",

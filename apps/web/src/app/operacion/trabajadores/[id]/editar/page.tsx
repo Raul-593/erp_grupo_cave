@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getWorker } from '@erp/db';
 import { WorkerForm } from '@/components/forms/WorkerForm';
 import { Card, PageHeader } from '@/components/ui';
+import { requirePageUser } from '@/server/auth';
 import { db } from '@/server/db';
 
 export const metadata: Metadata = { title: 'Editar trabajador' };
@@ -10,6 +11,7 @@ export const metadata: Metadata = { title: 'Editar trabajador' };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function EditarTrabajadorPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageUser('catalogs.write');
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const worker = await getWorker(db(), id);

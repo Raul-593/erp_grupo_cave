@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import { listClients } from '@erp/db';
 import { ProjectForm } from '@/components/forms/ProjectForm';
 import { Card, PageHeader } from '@/components/ui';
+import { requirePageUser } from '@/server/auth';
 import { db } from '@/server/db';
 
 export const metadata: Metadata = { title: 'Nuevo proyecto' };
 
 export default async function NuevoProyectoPage() {
+  await requirePageUser('projects.write');
   const clients = await listClients(db());
   return (
     <>

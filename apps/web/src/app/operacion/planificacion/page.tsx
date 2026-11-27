@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import { listActivities, listSuppliers, listWorkers, type Activity } from '@erp/db';
 import { ActivityCells, PlanCells, type Option } from '@/components/operacion/inline';
-import { DemoBanner, Kpis, ModuleEmpty, ProductCell, ViewChips } from '@/components/operacion/shared';
+import { DemoBanner, Kpis, ModuleEmpty, ProductCell, ScopeBanner, ViewChips } from '@/components/operacion/shared';
 import { Card, EmptyState, Note } from '@/components/ui';
 import { PageHeader } from '@/components/ui';
 import { formatAmount, formatDateRange, formatDayMonth, formatQuantity } from '@/lib/format';
 import { ganttBar, ganttRange, ganttTicks } from '@/lib/gantt';
 import { ACTIVITY_STATUS } from '@/lib/labels';
+import { can } from '@/domain/access/permissions';
 import { compactCodes } from '@/lib/numbering';
+import { requirePageUser } from '@/server/auth';
 import { getCurrentProject } from '@/server/current-project';
 import { db } from '@/server/db';
 import { loadMatrixView, type MatrixView } from '@/server/matrix';
@@ -340,14 +342,26 @@ function ClientView({ view }: { view: MatrixView }) {
 }
 
 export default async function PlanificacionPage({ searchParams }: { searchParams: Promise<{ vista?: string | string[] }> }) {
+  const user = await requirePageUser('matrix.read');
+  const canCreate = can(user.role, 'projects.write');
   const project = await getCurrentProject();
-  if (!project) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="project" />;
-  const view = await loadMatrixView(project.id);
-  if (!view) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="matrix" />;
+  if (!project) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="project" canCreate={canCreate} />;
+  const view = await loadMatrixView(project.id, user);
+  if (!view) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="matrix" canCreate={canCreate} />;
 
+  // El empleado de campo no ve la vista del cliente (es de todo el proyecto).
+  const views = view.scoped ? VIEWS.filter(([value]) => value !== 'cliente') : VIEWS;
   const requested = (await searchParams).vista;
-  const current: View = VIEWS.find(([value]) => value === requested)?.[0] ?? 'matriz';
-  const activities = current === 'cronograma' || current === 'actividades' ? await listActivities(db(), project.id) : [];
+  const current: View = views.find(([value]) => value === requested)?.[0] ?? 'matriz';
+  const visibleItems = new Set(view.items.map((item) => item.id));
+  const activities = (current === 'cronograma' || current === 'actividades' ? await listActivities(db(), project.id) : []).filter(
+    // Con alcance: las actividades de sus ítems, las que tiene a cargo y las de equipo completo.
+    (activity) =>
+      !view.scoped ||
+      activity.wholeTeam ||
+      activity.workerId === user.workerId ||
+      activity.itemIds.some((id) => visibleItems.has(id)),
+  );
   const [workers, suppliers] =
     current === 'matriz' || current === 'actividades'
       ? await Promise.all([listWorkers(db(), { onlyActive: true }), listSuppliers(db(), { onlyActive: true })])
@@ -359,7 +373,8 @@ export default async function PlanificacionPage({ searchParams }: { searchParams
     <>
       <PageHeader title={TITLE} subtitle={SUBTITLE} />
       {view.demo ? <DemoBanner source={view.matrix.model} /> : null}
-      <ViewChips basePath="/operacion/planificacion" current={current} options={VIEWS} />
+      {view.scoped ? <ScopeBanner count={view.items.length} /> : null}
+      <ViewChips basePath="/operacion/planificacion" current={current} options={views} />
       {current === 'matriz' ? (
         <MatrixTable
           view={view}

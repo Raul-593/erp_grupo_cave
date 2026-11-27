@@ -8,6 +8,8 @@ import { formatAmount, formatDayMonth } from '@/lib/format';
 import { ITEM_PAYMENT_STATUS, PAYMENT_METHOD, PAYMENT_SUPPORT } from '@/lib/labels';
 import { compareAmounts, percentOf, sumAmounts } from '@/lib/money';
 import { compactCodes } from '@/lib/numbering';
+import { can } from '@/domain/access/permissions';
+import { requirePageUser } from '@/server/auth';
 import { getCurrentProject } from '@/server/current-project';
 import { db } from '@/server/db';
 import { loadMatrixView } from '@/server/matrix';
@@ -19,10 +21,14 @@ const SUBTITLE =
   'Lo que ya se compró y cómo se está pagando: las órdenes de cada entregable y los pagos registrados contra ellas, repartidos entre sus ítems.';
 
 export default async function AbastecimientoPage() {
+  // Superusuario: edita. Contabilidad: solo lectura (U-D6). Campo y proveedor no entran.
+  const user = await requirePageUser('procurement.read');
+  const canWrite = can(user.role, 'procurement.write');
+  const canCreate = can(user.role, 'projects.write');
   const project = await getCurrentProject();
-  if (!project) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="project" />;
-  const view = await loadMatrixView(project.id);
-  if (!view) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="matrix" />;
+  if (!project) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="project" canCreate={canCreate} />;
+  const view = await loadMatrixView(project.id, user);
+  if (!view) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="matrix" canCreate={canCreate} />;
 
   const [payments, orders, workers] = await Promise.all([
     listPayments(db(), project.id),
@@ -48,7 +54,7 @@ export default async function AbastecimientoPage() {
         title={TITLE}
         subtitle={SUBTITLE}
         actions={
-          orders.length > 0 ? (
+          canWrite && orders.length > 0 ? (
             <Link href="/operacion/abastecimiento/pagos/nuevo" className="btn btn-p">
               Registrar pago
             </Link>
@@ -151,7 +157,7 @@ export default async function AbastecimientoPage() {
             </tfoot>
           </table>
         </div>
-        <NewOrderForm projectId={project.id} />
+        {canWrite ? <NewOrderForm projectId={project.id} /> : null}
         {emptyOrders.length > 0 ? (
           <p className="border-t border-line px-4 py-2.5 text-[11.5px] text-mut">
             {emptyOrders.length === 1 ? 'Orden sin ítems todavía: ' : 'Órdenes sin ítems todavía: '}
@@ -163,7 +169,7 @@ export default async function AbastecimientoPage() {
       <Card
         title="Pagos registrados"
         actions={
-          orders.length > 0 ? (
+          canWrite && orders.length > 0 ? (
             <Link href="/operacion/abastecimiento/pagos/nuevo" className="btn">
               + Pago
             </Link>
@@ -172,7 +178,13 @@ export default async function AbastecimientoPage() {
       >
         {payments.length === 0 ? (
           <EmptyState icon="◷" title="Sin pagos registrados">
-            <p>{orders.length > 0 ? 'Registra el primer pago contra una orden.' : 'Crea primero una orden de compra.'}</p>
+            <p>
+              {!canWrite
+                ? 'Todavía no hay pagos en este proyecto.'
+                : orders.length > 0
+                  ? 'Registra el primer pago contra una orden.'
+                  : 'Crea primero una orden de compra.'}
+            </p>
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
@@ -219,18 +231,20 @@ export default async function AbastecimientoPage() {
                         <Pill tone={tone}>{label}</Pill>
                       </td>
                       <td>
-                        <div className="flex flex-wrap justify-end gap-[7px]">
-                          <Link href={`/operacion/abastecimiento/pagos/${payment.id}/editar`} className="btn">
-                            Editar
-                          </Link>
-                          <div>
-                            <DeletePaymentButton
-                              id={payment.id}
-                              version={payment.version}
-                              summary={`de ${money(payment.amount)} (${payment.orderCode}, ${formatDayMonth(payment.paidOn)})`}
-                            />
+                        {canWrite ? (
+                          <div className="flex flex-wrap justify-end gap-[7px]">
+                            <Link href={`/operacion/abastecimiento/pagos/${payment.id}/editar`} className="btn">
+                              Editar
+                            </Link>
+                            <div>
+                              <DeletePaymentButton
+                                id={payment.id}
+                                version={payment.version}
+                                summary={`de ${money(payment.amount)} (${payment.orderCode}, ${formatDayMonth(payment.paidOn)})`}
+                              />
+                            </div>
                           </div>
-                        </div>
+                        ) : null}
                       </td>
                     </tr>
                   );

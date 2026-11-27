@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient, createProject, getProject, updateProject, withTransaction, type Queryable } from '@erp/db';
 import { formValues, type ActionState } from '@/lib/action-state';
+import { audit, authorize, type SessionUser } from '../auth';
 import { db } from '../db';
 import { setCurrentProjectCookie } from '../current-project';
 import { toUserMessage } from '../errors';
@@ -20,15 +21,19 @@ import {
 async function resolveClientId(
   tx: Queryable,
   data: { clientId: string; newClientName: string | null; newClientTaxId: string | null },
+  user: SessionUser,
 ): Promise<string> {
   if (data.clientId !== NEW_CLIENT) return data.clientId;
   const client = await createClient(tx, { name: data.newClientName ?? '', taxId: data.newClientTaxId });
+  await audit(tx, user, 'client.create', 'clients', client.id, { name: client.name });
   return client.id;
 }
 
 /** Alta o edición básica de un proyecto. */
 export async function saveProject(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = formValues(formData);
+  const auth = await authorize('projects.write');
+  if (!auth.ok) return { status: 'error', message: auth.message, values };
   const parsed = projectFormSchema.safeParse(values);
   if (!parsed.success) {
     return { status: 'error', message: 'Revisa los campos marcados.', fieldErrors: fieldErrors(parsed.error), values };
@@ -40,7 +45,7 @@ export async function saveProject(_prev: ActionState, formData: FormData): Promi
   let projectId: string;
   try {
     projectId = await withTransaction(db(), async (tx) => {
-      const clientId = await resolveClientId(tx, data);
+      const clientId = await resolveClientId(tx, data, auth.user);
       const basic = {
         name: data.name,
         clientId,
@@ -55,15 +60,18 @@ export async function saveProject(_prev: ActionState, formData: FormData): Promi
       if (editingId) {
         const version = versionSchema.parse(values['version']);
         await updateProject(tx, editingId.data, version, basic);
+        await audit(tx, auth.user, 'project.update', 'projects', editingId.data, { name: basic.name });
         return editingId.data;
       }
-      return createProject(tx, {
+      const id = await createProject(tx, {
         ...basic,
         processCode: null,
         purpose: null,
         termText: null,
         contractAdministrator: null,
       });
+      await audit(tx, auth.user, 'project.create', 'projects', id, { name: basic.name });
+      return id;
     });
   } catch (error) {
     return { status: 'error', message: toUserMessage(error), values };
@@ -78,6 +86,8 @@ export async function saveProject(_prev: ActionState, formData: FormData): Promi
 /** Guarda la ficha del proyecto desde la pestaña Requerimiento. */
 export async function saveFicha(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = formValues(formData);
+  const auth = await authorize('projects.write');
+  if (!auth.ok) return { status: 'error', message: auth.message, values };
   const id = idSchema('Proyecto').safeParse(values['id']);
   if (!id.success) return { status: 'error', message: 'Proyecto no válido.', values };
   const parsed = fichaFormSchema.safeParse(values);
@@ -87,7 +97,8 @@ export async function saveFicha(_prev: ActionState, formData: FormData): Promise
   const data = parsed.data;
   try {
     await withTransaction(db(), async (tx) => {
-      const clientId = await resolveClientId(tx, data);
+      const clientId = await resolveClientId(tx, data, auth.user);
+      await audit(tx, auth.user, 'project.update_ficha', 'projects', id.data);
       await updateProject(tx, id.data, data.version, {
         clientId,
         processCode: data.processCode,
@@ -112,6 +123,8 @@ export async function saveFicha(_prev: ActionState, formData: FormData): Promise
 /** Guarda solo el valor del proyecto (formulario independiente, p. ej. junto a la carga del TDR). */
 export async function saveProjectValue(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = formValues(formData);
+  const auth = await authorize('projects.write');
+  if (!auth.ok) return { status: 'error', message: auth.message, values };
   const id = idSchema('Proyecto').safeParse(values['id']);
   if (!id.success) return { status: 'error', message: 'Proyecto no válido.', values };
   const parsed = projectValueSchema.safeParse(values);
@@ -120,7 +133,10 @@ export async function saveProjectValue(_prev: ActionState, formData: FormData): 
   }
   const { version, ...value } = parsed.data;
   try {
-    await updateProject(db(), id.data, version, value);
+    await withTransaction(db(), async (tx) => {
+      await updateProject(tx, id.data, version, value);
+      await audit(tx, auth.user, 'project.update_value', 'projects', id.data, value);
+    });
   } catch (error) {
     return { status: 'error', message: toUserMessage(error), values };
   }
@@ -132,6 +148,8 @@ export async function saveProjectValue(_prev: ActionState, formData: FormData): 
 export async function selectProject(formData: FormData): Promise<void> {
   const id = idSchema('Proyecto').safeParse(formData.get('projectId'));
   if (!id.success) return;
+  const auth = await authorize('projects.read', { projectId: id.data });
+  if (!auth.ok) return;
   const project = await getProject(db(), id.data);
   if (!project) return;
   await setCurrentProjectCookie(project.id);

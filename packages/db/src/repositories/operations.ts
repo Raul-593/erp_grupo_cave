@@ -91,6 +91,7 @@ export async function listPayments(db: Queryable, projectId: string): Promise<Pa
 export interface PreEventCheck {
   id: string;
   description: string;
+  workerId: string | null;
   workerName: string | null;
   dueAt: Date | null;
   result: CheckResult;
@@ -99,7 +100,7 @@ export interface PreEventCheck {
 
 export async function listPreEventChecks(db: Queryable, projectId: string): Promise<PreEventCheck[]> {
   const { rows } = await db.query<PreEventCheck>(
-    `SELECT c.id, c.description, w.full_name AS "workerName", c.due_at AS "dueAt", c.result, c.version
+    `SELECT c.id, c.description, c.worker_id AS "workerId", w.full_name AS "workerName", c.due_at AS "dueAt", c.result, c.version
        FROM pre_event_checks c
        LEFT JOIN workers w ON w.id = c.worker_id
       WHERE c.project_id = $1

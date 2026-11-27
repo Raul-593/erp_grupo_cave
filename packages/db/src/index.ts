@@ -15,6 +15,7 @@ export {
   CHECK_RESULTS,
   EVIDENCE_MIME_TYPES,
   ITEM_PAYMENT_STATUSES,
+  USER_ROLES,
 } from './domain.ts';
 export type {
   ExtractionStatus,
@@ -29,6 +30,7 @@ export type {
   CheckResult,
   EvidenceMimeType,
   ItemPaymentStatus,
+  UserRole,
 } from './domain.ts';
 export { seedDemo, buildDemoRawResponse, findDemoExtraction, DemoSeedError, DEMO_PROVIDER, DEMO_PROMPT_VERSION } from './demo/seed.ts';
 export type { DemoSeedOptions, DemoSeedResult, DemoPreviousProject } from './demo/seed.ts';

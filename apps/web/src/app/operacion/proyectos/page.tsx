@@ -2,13 +2,17 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Card, EmptyState, PageHeader, Pill } from '@/components/ui';
 import { formatAmount, formatDateRange } from '@/lib/format';
+import { can } from '@/domain/access/permissions';
 import { selectProject } from '@/server/actions/projects';
+import { requirePageUser } from '@/server/auth';
 import { loadProjectContext } from '@/server/current-project';
 
 export const metadata: Metadata = { title: 'Proyectos' };
 
 export default async function ProyectosPage() {
-  const { projects, current } = await loadProjectContext();
+  const user = await requirePageUser('projects.read');
+  const { projects, current } = await loadProjectContext(user);
+  const canWrite = can(user.role, 'projects.write');
 
   return (
     <>
@@ -16,15 +20,19 @@ export default async function ProyectosPage() {
         title="Proyectos"
         subtitle="Cada proyecto tiene un contratante y su requerimiento. Elige uno para trabajar su TDR."
         actions={
-          <Link href="/operacion/proyectos/nuevo" className="btn btn-p">
-            + Nuevo proyecto
-          </Link>
+          canWrite ? (
+            <Link href="/operacion/proyectos/nuevo" className="btn btn-p">
+              + Nuevo proyecto
+            </Link>
+          ) : undefined
         }
       />
       <Card>
         {projects.length === 0 ? (
           <EmptyState icon="◫" title="Sin proyectos">
-            <p>Crea el primer proyecto para cargar su TDR.</p>
+            <p>
+              {canWrite ? 'Crea el primer proyecto para cargar su TDR.' : 'Todavía no tienes ítems asignados en ningún proyecto.'}
+            </p>
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
@@ -75,9 +83,11 @@ export default async function ProyectosPage() {
                             Requerimiento
                           </button>
                         </form>
-                        <Link href={`/operacion/proyectos/${project.id}/editar`} className="btn">
-                          Editar
-                        </Link>
+                        {canWrite ? (
+                          <Link href={`/operacion/proyectos/${project.id}/editar`} className="btn">
+                            Editar
+                          </Link>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

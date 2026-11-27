@@ -6,7 +6,9 @@ import { DeleteEvidenceButton, EvidenceUploader } from '@/components/operacion/e
 import { DemoBanner } from '@/components/operacion/shared';
 import { Card, EmptyState, FichaGrid, Note, PageHeader, Pill } from '@/components/ui';
 import { formatBytes, formatDateTime } from '@/lib/format';
+import { can, canDeleteEvidence } from '@/domain/access/permissions';
 import { MOUNT_STATUS } from '@/lib/labels';
+import { requirePageUser } from '@/server/auth';
 import { getCurrentProject } from '@/server/current-project';
 import { db } from '@/server/db';
 import { UUID } from '@/server/http';
@@ -18,12 +20,14 @@ export const metadata: Metadata = { title: 'Fotografías del ítem' };
 const MOUNTED_FROM = MOUNT_STATUSES.indexOf('mounted');
 
 export default async function EvidenciasItemPage({ params }: { params: Promise<{ itemId: string }> }) {
+  const user = await requirePageUser('evidence.read');
   const { itemId } = await params;
   if (!UUID.test(itemId)) notFound();
   const project = await getCurrentProject();
   if (!project) notFound();
-  // El ítem debe pertenecer a la matriz confirmada vigente del proyecto seleccionado.
-  const view = await loadMatrixView(project.id);
+  // El ítem debe pertenecer a la matriz confirmada vigente del proyecto seleccionado y al
+  // alcance del usuario (el empleado de campo, solo sus ítems).
+  const view = await loadMatrixView(project.id, user);
   const item = view?.items.find((row) => row.id === itemId);
   if (!view || !item) notFound();
 
@@ -66,9 +70,11 @@ export default async function EvidenciasItemPage({ params }: { params: Promise<{
         />
       </Card>
 
-      <Card title="Subir fotografías">
-        <EvidenceUploader itemId={item.id} maxBytes={maxEvidenceBytes()} />
-      </Card>
+      {can(user.role, 'evidence.upload') ? (
+        <Card title="Subir fotografías">
+          <EvidenceUploader itemId={item.id} maxBytes={maxEvidenceBytes()} />
+        </Card>
+      ) : null}
 
       <Card title={`${evidences.length} ${evidences.length === 1 ? 'fotografía' : 'fotografías'}`}>
         {evidences.length === 0 ? (
@@ -95,10 +101,15 @@ export default async function EvidenciasItemPage({ params }: { params: Promise<{
                   <p className="mt-0.5 text-[11px] break-all text-mut2">
                     {evidence.originalFilename} · {formatBytes(evidence.sizeBytes)}
                   </p>
-                  <p className="text-[11px] text-mut2">Cargada el {formatDateTime(evidence.uploadedAt)}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <DeleteEvidenceButton id={evidence.id} filename={evidence.originalFilename} />
-                  </div>
+                  <p className="text-[11px] text-mut2">
+                    Cargada el {formatDateTime(evidence.uploadedAt)}
+                    {evidence.uploadedByName ? ` por ${evidence.uploadedByName}` : ''}
+                  </p>
+                  {canDeleteEvidence(user, evidence.uploadedBy) ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <DeleteEvidenceButton id={evidence.id} filename={evidence.originalFilename} />
+                    </div>
+                  ) : null}
                 </div>
               </li>
             ))}

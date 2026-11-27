@@ -137,7 +137,15 @@ export interface MatrixTotals {
   evidenceCount: number;
 }
 
-export async function getMatrixTotals(db: Queryable, extractionId: string): Promise<MatrixTotals> {
+/**
+ * Con `workerId`, los indicadores cuentan solo los ítems de ese responsable (alcance de un
+ * empleado de campo) y los pagos, que son de todo el proyecto, quedan en cero.
+ */
+export async function getMatrixTotals(
+  db: Queryable,
+  extractionId: string,
+  options: { workerId?: string | null } = {},
+): Promise<MatrixTotals> {
   const { rows } = await db.query<MatrixTotals>(
     `WITH item AS (
        SELECT i.id, lower(btrim(i.rubro)) AS rubro, a.worker_id, p.planned_cost, s.id AS supplier_id, s.kind,
@@ -150,12 +158,14 @@ export async function getMatrixTotals(db: Queryable, extractionId: string): Prom
          LEFT JOIN purchase_order_lines l ON l.tdr_item_id = i.id
          LEFT JOIN item_execution e ON e.tdr_item_id = i.id
         WHERE i.extraction_id = $1
+          AND ($2::uuid IS NULL OR a.worker_id = $2::uuid)
      ), payment AS (
        SELECT p.amount,
               COALESCE((SELECT sum(a.amount) FROM payment_allocations a WHERE a.payment_id = p.id), 0) AS allocated
          FROM payments p
          JOIN purchase_orders o ON o.id = p.purchase_order_id
-        WHERE o.project_id = (SELECT d.project_id
+        WHERE $2::uuid IS NULL
+          AND o.project_id = (SELECT d.project_id
                                 FROM tdr_extractions x
                                 JOIN tdr_documents d ON d.id = x.tdr_document_id
                                WHERE x.id = $1)
@@ -182,7 +192,7 @@ export async function getMatrixTotals(db: Queryable, extractionId: string): Prom
             (count(*) FILTER (WHERE evidences > 0))::int AS "itemsWithEvidence",
             COALESCE(sum(evidences), 0)::int AS "evidenceCount"
        FROM item`,
-    [extractionId],
+    [extractionId, options.workerId ?? null],
   );
   const totals = rows[0];
   if (!totals) throw new Error('Totales de la matriz sin resultado');

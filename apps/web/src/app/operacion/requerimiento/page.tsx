@@ -20,10 +20,13 @@ import { Card, EmptyState, Note, PageHeader, Pill } from '@/components/ui';
 import { validateExtractionOutput, type ExtractionOutput } from '@/domain/tdr-extraction/contract';
 import { TDR_INPUT_ID } from '@/lib/constants';
 import { ResponsibleSelect } from '@/components/operacion/inline';
+import { ScopeBanner } from '@/components/operacion/shared';
 import { QuotesCards } from '@/components/requerimiento/QuotesCards';
 import { formatBytes, formatDateTime, formatQuantity } from '@/lib/format';
 import { itemCodes } from '@/lib/numbering';
+import { can } from '@/domain/access/permissions';
 import { projectValueToForm } from '@/lib/project-value';
+import { requirePageUser } from '@/server/auth';
 import { getCurrentProject } from '@/server/current-project';
 import { db } from '@/server/db';
 import { aiStatus, sweepInterruptedExtractions } from '@/server/extraction-runner';
@@ -65,6 +68,12 @@ const SUBTITLE =
   'El punto de partida del proyecto: aquí se carga el TDR y queda convertido en la ficha y la matriz de entregables, con un responsable por ítem.';
 
 export default async function RequerimientoPage() {
+  const user = await requirePageUser('matrix.read');
+  // Superusuario: todo. Contabilidad: documentos y matriz en lectura. Campo: ficha y sus ítems.
+  const canManageTdr = can(user.role, 'tdr.manage');
+  const canReadTdr = can(user.role, 'tdr.read');
+  const canWriteProject = can(user.role, 'projects.write');
+  const canAssign = can(user.role, 'items.assign');
   const project = await getCurrentProject();
 
   if (!project) {
@@ -72,11 +81,17 @@ export default async function RequerimientoPage() {
       <>
         <PageHeader title="Requerimiento" subtitle={SUBTITLE} />
         <Card>
-          <EmptyState icon="◫" title="Todavía no hay proyectos">
-            <p>Crea un proyecto y su contratante para cargar el TDR.</p>
-            <Link href="/operacion/proyectos/nuevo" className="btn btn-p mt-4">
-              + Nuevo proyecto
-            </Link>
+          <EmptyState icon="◫" title={canWriteProject ? 'Todavía no hay proyectos' : 'No tienes proyectos asignados'}>
+            {canWriteProject ? (
+              <>
+                <p>Crea un proyecto y su contratante para cargar el TDR.</p>
+                <Link href="/operacion/proyectos/nuevo" className="btn btn-p mt-4">
+                  + Nuevo proyecto
+                </Link>
+              </>
+            ) : (
+              <p>Aquí aparecerán los proyectos donde seas responsable de algún ítem.</p>
+            )}
           </EmptyState>
         </Card>
       </>
@@ -84,11 +99,11 @@ export default async function RequerimientoPage() {
   }
 
   // Los intentos que quedaron activos tras un reinicio se marcan como interrumpidos.
-  await sweepInterruptedExtractions();
+  if (canManageTdr) await sweepInterruptedExtractions();
   const [documents, clients, workers] = await Promise.all([
-    listDocumentsByProject(db(), project.id),
-    listClients(db()),
-    listWorkers(db(), { onlyActive: true }),
+    canReadTdr ? listDocumentsByProject(db(), project.id) : Promise.resolve([]),
+    canWriteProject ? listClients(db()) : Promise.resolve([]),
+    canAssign ? listWorkers(db(), { onlyActive: true }) : Promise.resolve([]),
   ]);
   const latest = documents[0];
   const ai = aiStatus();
@@ -102,12 +117,13 @@ export default async function RequerimientoPage() {
   const codes = proposal ? itemCodes(proposal.items) : [];
 
   // Matriz confirmada vigente del proyecto (con responsable por ítem) y sus cotizaciones.
-  const confirmed = await loadMatrixView(project.id);
-  const [quoteRequests, quoteLines] = confirmed
+  const confirmed = await loadMatrixView(project.id, user);
+  const [quoteRequests, quoteLines] = confirmed && can(user.role, 'quotes.read')
     ? await Promise.all([listQuoteRequests(db(), project.id), listQuoteLines(db(), project.id)])
     : [[], []];
   // Una propuesta todavía sin confirmar del último documento tiene prioridad en la tarjeta de la matriz.
-  const showConfirmed = confirmed !== null && extraction?.status !== 'processed';
+  // Sin acceso a los documentos (campo) solo se muestra la matriz confirmada, nunca una propuesta.
+  const showConfirmed = confirmed !== null && (!canReadTdr || extraction?.status !== 'processed');
   // Datos de demostración (AGENTS.md §2): se rotulan como tales, nunca como propuesta de la IA.
   const demo = showConfirmed ? confirmed.demo : extraction?.provider === DEMO_PROVIDER;
   const rows: MatrixDisplayRow[] = showConfirmed
@@ -155,74 +171,85 @@ export default async function RequerimientoPage() {
         title="Requerimiento"
         subtitle={SUBTITLE}
         actions={
-          <>
-            <button type="button" className="btn" disabled title="Disponible en la etapa D (tabla editable)">
-              + Ítem
-            </button>
-            <label htmlFor={TDR_INPUT_ID} className="btn btn-p cursor-pointer">
-              Cargar TDR
-            </label>
-          </>
+          canManageTdr ? (
+            <>
+              <button type="button" className="btn" disabled title="Disponible en la etapa D (tabla editable)">
+                + Ítem
+              </button>
+              <label htmlFor={TDR_INPUT_ID} className="btn btn-p cursor-pointer">
+                Cargar TDR
+              </label>
+            </>
+          ) : undefined
         }
       />
 
-      <Card
-        title="Documento TDR"
-        actions={
-          <ProcessButton
-            documentId={latest?.id ?? null}
-            disabled={!latest || !ai.ready || extractionActive}
-            disabledReason={latest ? processDisabledReason : 'Primero carga el PDF del TDR.'}
-            label={extraction ? '◆ Volver a procesar con IA' : '◆ Procesar TDR con IA'}
-          />
-        }
-      >
-        <AutoRefresh active={extractionActive} />
-        {documents.length > 0 ? (
-          <ul className="border-b border-line">
-            {documents.map((document) => {
-              const status = document.latestExtractionStatus ? EXTRACTION_STATUS[document.latestExtractionStatus] : null;
-              return (
-                <li key={document.id} className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-[11px] last:border-b-0">
-                  <div className="min-w-0 flex-1">
-                    <b className="font-semibold break-all">{document.originalFilename}</b>
-                    <small className="mt-0.5 block text-[11.5px] text-mut2">
-                      {formatBytes(document.sizeBytes)}
-                      {document.pageCount ? ` · ${document.pageCount} págs.` : ''} · cargado el {formatDateTime(document.uploadedAt)}
-                    </small>
-                  </div>
-                  {status ? <Pill tone={status[1]}>{status[0]}</Pill> : <Pill>Sin procesar</Pill>}
-                  <a href={`/api/tdr/${document.id}`} target="_blank" rel="noopener" className="btn">
-                    Ver PDF
-                  </a>
-                  {document.extractionCount === 0 ? (
-                    <DeleteDocumentButton id={document.id} filename={document.originalFilename} />
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-        {extraction ? <ExtractionPanel extraction={extraction} output={proposal} /> : null}
-        {!ai.ready ? (
-          <div className="border-t border-line px-4 py-3 text-[12px] text-ink2">
-            <p className="font-semibold text-wa">La IA todavía no está configurada; «Procesar TDR con IA» está deshabilitado.</p>
-            <ul className="mt-1 list-disc pl-5 text-mut">
-              {ai.problems.map((problem) => (
-                <li key={problem}>{problem}</li>
-              ))}
+      {confirmed?.scoped ? <ScopeBanner count={confirmed.items.length} /> : null}
+
+      {canReadTdr ? (
+        <Card
+          title="Documento TDR"
+          actions={
+            canManageTdr ? (
+              <ProcessButton
+                documentId={latest?.id ?? null}
+                disabled={!latest || !ai.ready || extractionActive}
+                disabledReason={latest ? processDisabledReason : 'Primero carga el PDF del TDR.'}
+                label={extraction ? '◆ Volver a procesar con IA' : '◆ Procesar TDR con IA'}
+              />
+            ) : undefined
+          }
+        >
+          <AutoRefresh active={extractionActive} />
+          {documents.length > 0 ? (
+            <ul className="border-b border-line">
+              {documents.map((document) => {
+                const status = document.latestExtractionStatus ? EXTRACTION_STATUS[document.latestExtractionStatus] : null;
+                return (
+                  <li key={document.id} className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-[11px] last:border-b-0">
+                    <div className="min-w-0 flex-1">
+                      <b className="font-semibold break-all">{document.originalFilename}</b>
+                      <small className="mt-0.5 block text-[11.5px] text-mut2">
+                        {formatBytes(document.sizeBytes)}
+                        {document.pageCount ? ` · ${document.pageCount} págs.` : ''} · cargado el {formatDateTime(document.uploadedAt)}
+                      </small>
+                    </div>
+                    {status ? <Pill tone={status[1]}>{status[0]}</Pill> : <Pill>Sin procesar</Pill>}
+                    <a href={`/api/tdr/${document.id}`} target="_blank" rel="noopener" className="btn">
+                      Ver PDF
+                    </a>
+                    {canManageTdr && document.extractionCount === 0 ? (
+                      <DeleteDocumentButton id={document.id} filename={document.originalFilename} />
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
-          </div>
-        ) : (
-          <p className="border-t border-line px-4 py-2.5 text-[11.5px] text-mut">
-            IA configurada: {ai.providerLabel} · {ai.model}
-          </p>
-        )}
-        <TdrUploader projectId={project.id} maxBytes={maxTdrBytes()} compact={documents.length > 0} />
-        <div className="border-t border-line px-4 pt-3 pb-4">
-          <ProjectValueForm projectId={project.id} version={project.version} initial={projectValueToForm(project)} />
-        </div>
-      </Card>
+          ) : null}
+          {extraction ? <ExtractionPanel extraction={extraction} output={proposal} /> : null}
+          {!canManageTdr ? null : !ai.ready ? (
+            <div className="border-t border-line px-4 py-3 text-[12px] text-ink2">
+              <p className="font-semibold text-wa">La IA todavía no está configurada; «Procesar TDR con IA» está deshabilitado.</p>
+              <ul className="mt-1 list-disc pl-5 text-mut">
+                {ai.problems.map((problem) => (
+                  <li key={problem}>{problem}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="border-t border-line px-4 py-2.5 text-[11.5px] text-mut">
+              IA configurada: {ai.providerLabel} · {ai.model}
+            </p>
+          )}
+          {canManageTdr ? <TdrUploader projectId={project.id} maxBytes={maxTdrBytes()} compact={documents.length > 0} /> : null}
+          {canWriteProject ? (
+            <div className="border-t border-line px-4 pt-3 pb-4">
+              <ProjectValueForm projectId={project.id} version={project.version} initial={projectValueToForm(project)} />
+            </div>
+          ) : null}
+          {!canManageTdr && documents.length === 0 ? <p className="px-4 py-3 text-[12px] text-mut">Sin documentos cargados.</p> : null}
+        </Card>
+      ) : null}
 
       <FichaCard
         key={project.id}
@@ -246,7 +273,7 @@ export default async function RequerimientoPage() {
         }}
         clients={clients.map(({ id, name, taxId }) => ({ id, name, taxId }))}
         scope={hasMatrix ? `${rows.length} ítems en ${rubroCount} rubros (${matrixKind})` : 'Sin matriz todavía'}
-        documentLabel={latest ? latest.originalFilename : 'Sin cargar'}
+        documentLabel={!canReadTdr ? '—' : latest ? latest.originalFilename : 'Sin cargar'}
       />
 
       <Card
@@ -321,7 +348,7 @@ export default async function RequerimientoPage() {
         <div className="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-4 py-2.5 text-[11.5px] text-mut">
           <span>
             {hasMatrix ? `${rows.length} ítems · ${rubroCount} rubros · ` : '0 ítems · 0 rubros'}
-            {showConfirmed ? `${unassigned} sin responsable · ` : null}
+            {showConfirmed && !confirmed.scoped ? `${unassigned} sin responsable · ` : null}
             {hasMatrix ? (
               demo ? (
                 <b className="font-semibold text-wa">datos de demostración (ilustrativos), matriz confirmada</b>
@@ -333,7 +360,7 @@ export default async function RequerimientoPage() {
             ) : null}
           </span>
           <span className="ml-auto">
-            {workers.length === 0 ? (
+            {!canAssign ? null : workers.length === 0 ? (
               <>
                 Sin trabajadores activos para asignar.{' '}
                 <Link href="/operacion/trabajadores/nuevo" className="text-bl hover:underline">

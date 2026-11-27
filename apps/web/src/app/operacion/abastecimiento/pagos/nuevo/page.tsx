@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { listOrderLines, listPurchaseOrders } from '@erp/db';
 import { PaymentForm } from '@/components/operacion/payment-form';
 import { Card, PageHeader } from '@/components/ui';
+import { requirePageUser } from '@/server/auth';
 import { getCurrentProject } from '@/server/current-project';
 import { db } from '@/server/db';
 import { loadMatrixView } from '@/server/matrix';
@@ -10,6 +11,7 @@ import { loadMatrixView } from '@/server/matrix';
 export const metadata: Metadata = { title: 'Registrar pago' };
 
 export default async function NuevoPagoPage() {
+  await requirePageUser('procurement.write');
   const project = await getCurrentProject();
   if (!project) redirect('/operacion/abastecimiento');
   const [orders, lines, view] = await Promise.all([

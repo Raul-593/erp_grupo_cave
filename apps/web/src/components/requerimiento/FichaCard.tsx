@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { useCan } from '@/components/access';
 import { ClientSelect, Field, fieldProps } from '@/components/forms/fields';
 import { ProjectValueFields } from '@/components/forms/ProjectValueFields';
 import { Card, FichaGrid, FormMessage } from '@/components/ui';
@@ -57,6 +58,8 @@ export function FichaCard({
   scope: string;
   documentLabel: string;
 }) {
+  // Solo el superusuario edita la ficha; los demás la ven (el servidor también lo comprueba).
+  const canEdit = useCan('projects.write');
   const [editing, setEditing] = useState(false);
   const [state, action, pending] = useActionState(async (prev: ActionState, formData: FormData) => {
     const result = await saveFicha(prev, formData);
@@ -74,16 +77,18 @@ export function FichaCard({
     .filter((part) => part && part !== '—')
     .join(' · ');
 
-  if (!editing) {
+  if (!editing || !canEdit) {
     return (
       <Card
         title="Ficha del proyecto"
         actions={
           <>
             <FormMessage status={state.status} message={state.message} />
-            <button type="button" className="btn" onClick={() => setEditing(true)}>
-              Editar ficha
-            </button>
+            {canEdit ? (
+              <button type="button" className="btn" onClick={() => setEditing(true)}>
+                Editar ficha
+              </button>
+            ) : null}
           </>
         }
       >

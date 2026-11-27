@@ -6,6 +6,7 @@ import { Card, PageHeader } from '@/components/ui';
 import { ALLOCATION_PREFIX } from '@/lib/constants';
 import { formatAmount } from '@/lib/format';
 import { subtractAmounts } from '@/lib/money';
+import { requirePageUser } from '@/server/auth';
 import { db } from '@/server/db';
 import { loadMatrixView } from '@/server/matrix';
 
@@ -17,6 +18,7 @@ const amountText = (amount: string) => formatAmount(amount, 'USD').slice(1);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function EditarPagoPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageUser('procurement.write');
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const payment = await getPayment(db(), id);

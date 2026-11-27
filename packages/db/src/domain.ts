@@ -58,3 +58,7 @@ export type EvidenceMimeType = (typeof EVIDENCE_MIME_TYPES)[number];
 /** Estado de pago de un ítem; se calcula, no se guarda. */
 export const ITEM_PAYMENT_STATUSES = ['no_order', 'unpaid', 'partial', 'paid'] as const;
 export type ItemPaymentStatus = (typeof ITEM_PAYMENT_STATUSES)[number];
+
+/** Roles de usuario (migración 0009). Los permisos de cada rol se definen en la aplicación. */
+export const USER_ROLES = ['admin', 'field', 'accounting', 'supplier'] as const;
+export type UserRole = (typeof USER_ROLES)[number];

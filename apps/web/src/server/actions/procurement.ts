@@ -17,6 +17,7 @@ import {
 } from '@erp/db';
 import { formValues, type ActionState, type InlineResult } from '@/lib/action-state';
 import { ALLOCATION_PREFIX, RAISE_COST_FIRST } from '@/lib/constants';
+import { audit, authorize } from '../auth';
 import { db } from '../db';
 import { toUserMessage } from '../errors';
 import { loadMatrixView } from '../matrix';
@@ -38,13 +39,18 @@ const ITEM_GONE = 'El ítem ya no existe. Recarga la página.';
 /** Crea una orden de compra vacía en el proyecto; después se le asignan ítems. */
 export async function createOrder(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = formValues(formData);
+  const auth = await authorize('procurement.write');
+  if (!auth.ok) return { status: 'error', message: auth.message, values };
   const parsed = orderFormSchema.safeParse(values);
   if (!parsed.success) {
     return { status: 'error', message: 'Revisa el código.', fieldErrors: fieldErrors(parsed.error), values };
   }
   try {
     if (!(await getProject(db(), parsed.data.projectId))) return { status: 'error', message: 'El proyecto ya no existe.', values };
-    await createPurchaseOrder(db(), parsed.data.projectId, parsed.data.code);
+    await withTransaction(db(), async (tx) => {
+      const id = await createPurchaseOrder(tx, parsed.data.projectId, parsed.data.code);
+      await audit(tx, auth.user, 'purchase_order.create', 'purchase_orders', id, { code: parsed.data.code });
+    });
   } catch (error) {
     return { status: 'error', message: toUserMessage(error), values };
   }
@@ -57,13 +63,18 @@ export async function changeItemOrder(input: unknown): Promise<InlineResult> {
   const parsed = itemOrderChangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
   const { itemId, version, orderId } = parsed.data;
+  const auth = await authorize('procurement.write');
+  if (!auth.ok) return auth;
   try {
     const projectId = await getItemProjectId(db(), itemId);
     if (projectId === null) return { ok: false, message: ITEM_GONE };
     if (orderId !== null && (await getPurchaseOrderProjectId(db(), orderId)) !== projectId) {
       return { ok: false, message: 'Esa orden no pertenece a este proyecto.' };
     }
-    await setItemOrder(db(), itemId, version, orderId);
+    await withTransaction(db(), async (tx) => {
+      await setItemOrder(tx, itemId, version, orderId);
+      await audit(tx, auth.user, 'purchase_order_line.set_order', 'tdr_items', itemId, { orderId });
+    });
   } catch (error) {
     return { ok: false, message: toUserMessage(error) };
   }
@@ -76,8 +87,13 @@ export async function updateOrderLineField(input: unknown): Promise<InlineResult
   const parsed = orderLineChangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
   const change = parsed.data;
+  const auth = await authorize('procurement.write');
+  if (!auth.ok) return auth;
   try {
-    await updateOrderLine(db(), change.itemId, change.version, { [change.field]: change.value });
+    await withTransaction(db(), async (tx) => {
+      await updateOrderLine(tx, change.itemId, change.version, { [change.field]: change.value });
+      await audit(tx, auth.user, 'purchase_order_line.update', 'tdr_items', change.itemId, { [change.field]: change.value });
+    });
   } catch (error) {
     return { ok: false, message: toUserMessage(error) };
   }
@@ -91,6 +107,8 @@ export async function updateOrderLineField(input: unknown): Promise<InlineResult
  */
 export async function savePayment(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = formValues(formData);
+  const auth = await authorize('procurement.write');
+  if (!auth.ok) return { status: 'error', message: auth.message, values };
   const parsed = paymentFormSchema.safeParse(values);
   const split = parsePaymentAllocations(values, parsed.success ? parsed.data.amount : null);
   const invalid = { ...(parsed.success ? {} : fieldErrors(parsed.error)), ...split.fieldErrors };
@@ -105,10 +123,14 @@ export async function savePayment(_prev: ActionState, formData: FormData): Promi
     projectId = await getPurchaseOrderProjectId(db(), input.orderId);
     if (projectId === null) return { status: 'error', message: 'La orden ya no existe. Recarga la página.', values };
     await withTransaction(db(), async (tx) => {
+      const details = { orderId: input.orderId, amount: input.amount, allocations: input.allocations };
       if (values['id']) {
-        await updatePayment(tx, idSchema('Pago').parse(values['id']), versionSchema.parse(values['version']), input);
+        const id = idSchema('Pago').parse(values['id']);
+        await updatePayment(tx, id, versionSchema.parse(values['version']), input);
+        await audit(tx, auth.user, 'payment.update', 'payments', id, details);
       } else {
-        await createPayment(tx, input);
+        const id = await createPayment(tx, input);
+        await audit(tx, auth.user, 'payment.create', 'payments', id, details);
       }
     });
   } catch (error) {
@@ -134,9 +156,14 @@ export async function removePayment(input: unknown): Promise<InlineResult> {
   const id = idSchema('Pago').safeParse(candidate['id']);
   const version = versionSchema.safeParse(candidate['version']);
   if (!id.success || !version.success) return { ok: false, message: 'Pago no válido.' };
+  const auth = await authorize('procurement.write');
+  if (!auth.ok) return auth;
   try {
     // Borra también su reparto: lo pagado de sus ítems baja en la misma transacción.
-    await withTransaction(db(), (tx) => deletePayment(tx, id.data, version.data));
+    await withTransaction(db(), async (tx) => {
+      await deletePayment(tx, id.data, version.data);
+      await audit(tx, auth.user, 'payment.delete', 'payments', id.data);
+    });
   } catch (error) {
     return { ok: false, message: toUserMessage(error) };
   }

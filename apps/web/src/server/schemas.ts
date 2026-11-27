@@ -11,6 +11,7 @@ import {
   PAYMENT_METHODS,
   PAYMENT_SUPPORTS,
   SUPPLIER_KINDS,
+  USER_ROLES,
 } from '@erp/db';
 import { ALLOCATION_PREFIX, NEW_CLIENT } from '@/lib/constants';
 import { compareAmounts, sumAmounts } from '@/lib/money';
@@ -178,6 +179,36 @@ export const supplierFormSchema = z.object({
   notes: optionalLongText(2000, 'Notas'),
   active: field().transform((v) => v === 'on' || v === 'true'),
 });
+
+/**
+ * Alta o edición de un usuario (Administración › Usuarios). El campo exige trabajador; el
+ * proveedor exige proveedor; los demás vínculos se vacían según el rol (la base lo vuelve a
+ * comprobar).
+ */
+export const userFormSchema = z
+  .object({
+    fullName: requiredText(200, 'El nombre'),
+    email: optionalText(200, 'Correo')
+      .refine((v) => v === null || z.string().email().safeParse(v).success, 'Correo no válido.')
+      .transform((v) => (v === null ? null : v.toLowerCase())),
+    role: z.enum(USER_ROLES, 'Selecciona el tipo de usuario.'),
+    workerId: optionalId('Trabajador'),
+    supplierId: optionalId('Proveedor'),
+    active: field().transform((v) => v === 'on' || v === 'true'),
+  })
+  .superRefine((value, ctx) => {
+    if (value.role === 'field' && value.workerId === null) {
+      ctx.addIssue({ code: 'custom', message: 'Un empleado de campo debe estar vinculado a su trabajador.', path: ['workerId'] });
+    }
+    if (value.role === 'supplier' && value.supplierId === null) {
+      ctx.addIssue({ code: 'custom', message: 'Elige el proveedor al que pertenece el usuario.', path: ['supplierId'] });
+    }
+  })
+  .transform((value) => ({
+    ...value,
+    workerId: value.role === 'supplier' ? null : value.workerId,
+    supplierId: value.role === 'supplier' ? value.supplierId : null,
+  }));
 
 /** Cambio de responsable de un ítem: el responsable que se veía y el nuevo (vacío = sin asignar). */
 export const responsibleChangeSchema = z.object({

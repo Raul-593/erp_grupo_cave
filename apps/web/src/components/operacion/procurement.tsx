@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState, type ReactNode } from 'react';
+import { useCan } from '@/components/access';
 import { FormMessage } from '@/components/ui';
 import { IDLE } from '@/lib/action-state';
 import { changeItemOrder, createOrder, removePayment, updateOrderLineField } from '@/server/actions/procurement';
@@ -108,6 +109,22 @@ export function OrderCells({
     save(field, () => updateOrderLineField({ itemId, version, field, value }));
   };
   const message = (field: LineField) => (error?.field === field ? error.message : undefined);
+  // Contabilidad ve las órdenes sin poder cambiarlas (U-D6).
+  const canEdit = useCan('procurement.write');
+
+  if (!canEdit) {
+    return (
+      <>
+        <td className="tabular-nums">{orders.find((order) => order.id === orderId)?.name ?? <span className="text-mut">Sin orden</span>}</td>
+        <td>{buyerName ?? <span className="text-mut">—</span>}</td>
+        <td>{ordered ? (paymentWorkerName ?? <span className="text-mut">Sin asignar</span>) : <span className="text-mut">—</span>}</td>
+        <td className="num">{ordered ? (amount === null ? '—' : `${currencySymbol} ${amountText(amount)}`) : plannedCostText}</td>
+        <td className="num">{ordered ? paidText : <span className="text-mut">—</span>}</td>
+        <td className="num">{balanceText}</td>
+        <td>{status}</td>
+      </>
+    );
+  }
 
   return (
     <>

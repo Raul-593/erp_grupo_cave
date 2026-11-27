@@ -4,6 +4,7 @@ import { getProject, listClients } from '@erp/db';
 import { ProjectForm } from '@/components/forms/ProjectForm';
 import { Card, PageHeader } from '@/components/ui';
 import { projectValueToForm } from '@/lib/project-value';
+import { requirePageUser } from '@/server/auth';
 import { db } from '@/server/db';
 
 export const metadata: Metadata = { title: 'Editar proyecto' };
@@ -11,6 +12,7 @@ export const metadata: Metadata = { title: 'Editar proyecto' };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function EditarProyectoPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageUser('projects.write');
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const [project, clients] = await Promise.all([getProject(db(), id), listClients(db())]);

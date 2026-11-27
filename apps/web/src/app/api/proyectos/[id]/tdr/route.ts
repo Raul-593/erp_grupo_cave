@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache';
-import { createDocument, findDocumentByHash, getPgErrorCode, getProject, PgErrorCode } from '@erp/db';
+import { createDocument, findDocumentByHash, getPgErrorCode, getProject, PgErrorCode, withTransaction } from '@erp/db';
+import { audit, authorize } from '@/server/auth';
 import { db } from '@/server/db';
 import { toUserMessage } from '@/server/errors';
 import { isSameOrigin, jsonError, UUID } from '@/server/http';
@@ -15,6 +16,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!isSameOrigin(request)) return jsonError(403, 'Origen no permitido.');
   const { id } = await params;
   if (!UUID.test(id)) return jsonError(404, 'Proyecto no encontrado.');
+  const auth = await authorize('tdr.manage');
+  if (!auth.ok) return jsonError(auth.status, auth.message);
 
   const maxBytes = maxTdrBytes();
   const length = Number(request.headers.get('content-length'));
@@ -43,7 +46,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         storage: fileStorage(),
         maxBytes,
         findByHash: (projectId, sha256) => findDocumentByHash(db(), projectId, sha256),
-        create: (input) => createDocument(db(), input),
+        create: (input) =>
+          withTransaction(db(), async (tx) => {
+            const documentId = await createDocument(tx, input);
+            await audit(tx, auth.user, 'tdr_document.upload', 'tdr_documents', documentId, { projectId: input.projectId });
+            return documentId;
+          }),
         isUniqueViolation: (error) => getPgErrorCode(error) === PgErrorCode.uniqueViolation,
       },
       { projectId: project.id, name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()) },

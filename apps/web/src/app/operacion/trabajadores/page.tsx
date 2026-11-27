@@ -4,12 +4,16 @@ import { connection } from 'next/server';
 import { listWorkers } from '@erp/db';
 import { Card, EmptyState, Note, PageHeader, Pill } from '@/components/ui';
 import { setWorkerActive } from '@/server/actions/workers';
+import { can } from '@/domain/access/permissions';
+import { requirePageUser } from '@/server/auth';
 import { db } from '@/server/db';
 
 export const metadata: Metadata = { title: 'Trabajadores' };
 
 export default async function TrabajadoresPage() {
   await connection();
+  const user = await requirePageUser('catalogs.read');
+  const canWrite = can(user.role, 'catalogs.write');
   const workers = await listWorkers(db());
   const active = workers.filter((worker) => worker.active).length;
 
@@ -19,9 +23,11 @@ export default async function TrabajadoresPage() {
         title="Trabajadores"
         subtitle="Las personas que pueden ser responsables de un ítem de la matriz. Solo los activos aparecen en la lista desplegable."
         actions={
-          <Link href="/operacion/trabajadores/nuevo" className="btn btn-p">
-            + Nuevo trabajador
-          </Link>
+          canWrite ? (
+            <Link href="/operacion/trabajadores/nuevo" className="btn btn-p">
+              + Nuevo trabajador
+            </Link>
+          ) : undefined
         }
       />
       <Card title={workers.length ? `${active} activos de ${workers.length}` : undefined}>
@@ -59,19 +65,21 @@ export default async function TrabajadoresPage() {
                     <td className="num">{worker.assignmentCount}</td>
                     <td>{worker.active ? <Pill tone="ok">Activo</Pill> : <Pill>Inactivo</Pill>}</td>
                     <td>
-                      <div className="flex justify-end gap-[7px]">
-                        <Link href={`/operacion/trabajadores/${worker.id}/editar`} className="btn">
-                          Editar
-                        </Link>
-                        <form action={setWorkerActive}>
-                          <input type="hidden" name="id" value={worker.id} />
-                          <input type="hidden" name="version" value={worker.version} />
-                          <input type="hidden" name="active" value={worker.active ? 'false' : 'true'} />
-                          <button type="submit" className="btn">
-                            {worker.active ? 'Desactivar' : 'Activar'}
-                          </button>
-                        </form>
-                      </div>
+                      {canWrite ? (
+                        <div className="flex justify-end gap-[7px]">
+                          <Link href={`/operacion/trabajadores/${worker.id}/editar`} className="btn">
+                            Editar
+                          </Link>
+                          <form action={setWorkerActive}>
+                            <input type="hidden" name="id" value={worker.id} />
+                            <input type="hidden" name="version" value={worker.version} />
+                            <input type="hidden" name="active" value={worker.active ? 'false' : 'true'} />
+                            <button type="submit" className="btn">
+                              {worker.active ? 'Desactivar' : 'Activar'}
+                            </button>
+                          </form>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}

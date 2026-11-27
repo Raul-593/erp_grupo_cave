@@ -11,6 +11,9 @@ export interface Evidence {
   sizeBytes: number;
   description: string | null;
   uploadedAt: Date;
+  /** Usuario que la subió; null en las fotografías anteriores a la existencia de usuarios. */
+  uploadedBy: string | null;
+  uploadedByName: string | null;
 }
 
 /** Referencia completa al archivo, solo para el servidor. */
@@ -28,14 +31,17 @@ export interface EvidenceInput {
   sizeBytes: number;
   sha256: string;
   description: string | null;
+  uploadedBy: string | null;
 }
 
-const COLUMNS = `id, tdr_item_id AS "itemId", original_filename AS "originalFilename", mime_type AS "mimeType",
-  size_bytes::float8 AS "sizeBytes", description, uploaded_at AS "uploadedAt"`;
+const COLUMNS = `e.id, e.tdr_item_id AS "itemId", e.original_filename AS "originalFilename", e.mime_type AS "mimeType",
+  e.size_bytes::float8 AS "sizeBytes", e.description, e.uploaded_at AS "uploadedAt",
+  e.uploaded_by AS "uploadedBy", u.full_name AS "uploadedByName"`;
+const FROM = `item_evidences e LEFT JOIN app_users u ON u.id = e.uploaded_by`;
 
 export async function listItemEvidences(db: Queryable, itemId: string): Promise<Evidence[]> {
   const { rows } = await db.query<Evidence>(
-    `SELECT ${COLUMNS} FROM item_evidences WHERE tdr_item_id = $1 ORDER BY uploaded_at DESC, id`,
+    `SELECT ${COLUMNS} FROM ${FROM} WHERE e.tdr_item_id = $1 ORDER BY e.uploaded_at DESC, e.id`,
     [itemId],
   );
   return rows;
@@ -43,7 +49,7 @@ export async function listItemEvidences(db: Queryable, itemId: string): Promise<
 
 export async function getEvidenceFile(db: Queryable, id: string): Promise<EvidenceFile | null> {
   const { rows } = await db.query<EvidenceFile>(
-    `SELECT ${COLUMNS}, storage_provider AS "storageProvider", storage_key AS "storageKey" FROM item_evidences WHERE id = $1`,
+    `SELECT ${COLUMNS}, e.storage_provider AS "storageProvider", e.storage_key AS "storageKey" FROM ${FROM} WHERE e.id = $1`,
     [id],
   );
   return rows[0] ?? null;
@@ -65,8 +71,8 @@ export async function findEvidenceByHash(
 /** Registra una fotografía. La base solo la admite sobre ítems de una matriz confirmada. */
 export async function createEvidence(db: Queryable, input: EvidenceInput): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO item_evidences (tdr_item_id, storage_provider, storage_key, original_filename, mime_type, size_bytes, sha256, description)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    `INSERT INTO item_evidences (tdr_item_id, storage_provider, storage_key, original_filename, mime_type, size_bytes, sha256, description, uploaded_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
     [
       input.itemId,
       input.storageProvider,
@@ -76,6 +82,7 @@ export async function createEvidence(db: Queryable, input: EvidenceInput): Promi
       input.sizeBytes,
       input.sha256,
       input.description,
+      input.uploadedBy,
     ],
   );
   const id = rows[0]?.id;

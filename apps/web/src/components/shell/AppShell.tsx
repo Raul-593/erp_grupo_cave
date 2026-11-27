@@ -3,23 +3,22 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
+import type { NavLink, NavModule } from '@/lib/navigation';
 import { selectProject } from '@/server/actions/projects';
-import { BoxIcon, MenuIcon, ThemeIcon } from './icons';
-
-const TABS = [
-  { href: '/operacion/proyectos', label: 'Proyectos' },
-  { href: '/operacion/requerimiento', label: 'Requerimiento' },
-  { href: '/operacion/planificacion', label: 'Planificación' },
-  { href: '/operacion/abastecimiento', label: 'Abastecimiento' },
-  { href: '/operacion/ejecucion', label: 'Ejecución' },
-  { href: '/operacion/trabajadores', label: 'Trabajadores' },
-  { href: '/operacion/proveedores', label: 'Proveedores' },
-];
+import { signOut } from '@/server/actions/session';
+import { BoxIcon, MenuIcon, ThemeIcon, UsersIcon } from './icons';
 
 export interface ShellProject {
   id: string;
   name: string;
 }
+
+export interface ShellUser {
+  fullName: string;
+  roleLabel: string;
+}
+
+const MODULE_ICONS = { box: BoxIcon, users: UsersIcon } as const;
 
 function toggleTheme() {
   const html = document.documentElement;
@@ -32,14 +31,24 @@ function toggleTheme() {
   }
 }
 
-/** Barra lateral, barra superior con selector de proyecto y pestañas de Operación. */
+/**
+ * Barra lateral con los módulos del rol, barra superior (selector de proyecto si el módulo lo
+ * usa, usuario y «Cerrar sesión») y pestañas del módulo.
+ */
 export function AppShell({
+  user,
+  modules,
+  tabs,
   projects,
   currentProjectId,
   children,
 }: {
-  projects: ShellProject[];
-  currentProjectId: string | null;
+  user: ShellUser;
+  modules: NavModule[];
+  tabs: NavLink[];
+  /** Sin valor, el módulo no usa el selector de proyecto. */
+  projects?: ShellProject[];
+  currentProjectId?: string | null;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -69,19 +78,30 @@ export function AppShell({
         </div>
         <div className="px-[18px] pt-4 pb-[7px] text-[8.5px] tracking-[0.16em] text-white/30 uppercase">Gestión</div>
         <nav aria-label="Módulos">
-          <Link
-            href="/operacion/requerimiento"
-            onClick={() => setMenuOpen(false)}
-            aria-current={pathname.startsWith('/operacion') ? 'page' : undefined}
-            className="relative flex w-full items-center gap-2.5 bg-white/7 px-[18px] py-2 text-[11px] font-medium tracking-[0.07em] text-white uppercase before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-bl"
-          >
-            <BoxIcon />
-            <span>Operación</span>
-          </Link>
+          {modules.map((module) => {
+            const Icon = MODULE_ICONS[module.icon];
+            const active = pathname.startsWith(module.prefix);
+            return (
+              <Link
+                key={module.prefix}
+                href={module.href}
+                onClick={() => setMenuOpen(false)}
+                aria-current={active ? 'page' : undefined}
+                className={`relative flex w-full items-center gap-2.5 px-[18px] py-2 text-[11px] font-medium tracking-[0.07em] uppercase ${
+                  active
+                    ? 'bg-white/7 text-white before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-bl'
+                    : 'text-white/60 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <Icon />
+                <span>{module.label}</span>
+              </Link>
+            );
+          })}
         </nav>
         <div className="mt-auto border-t border-white/8 px-[18px] pt-3.5 text-[11px] leading-relaxed text-white/55">
           Prototipo local
-          <span className="block text-[9px] tracking-[0.08em] text-white/35 uppercase">Sin autenticación · 127.0.0.1</span>
+          <span className="block text-[9px] tracking-[0.08em] text-white/35 uppercase">Ingreso de desarrollo · 127.0.0.1</span>
         </div>
       </aside>
 
@@ -96,32 +116,43 @@ export function AppShell({
           >
             <MenuIcon />
           </button>
-          <form action={selectProject} className="flex items-center gap-1.5 rounded-md border border-line bg-card px-[9px] py-[5px]">
-            <label htmlFor="proyecto-activo" className="text-[8.5px] tracking-[0.1em] text-mut2 uppercase">
-              Proyecto
-            </label>
-            {projects.length > 0 ? (
-              <select
-                id="proyecto-activo"
-                name="projectId"
-                defaultValue={currentProjectId ?? undefined}
-                key={currentProjectId ?? 'ninguno'}
-                onChange={(event) => event.currentTarget.form?.requestSubmit()}
-                className="max-w-[108px] cursor-pointer bg-card text-[12.5px] font-medium outline-none min-[881px]:max-w-[240px]"
-              >
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span id="proyecto-activo" className="text-[12.5px] text-mut">
-                Sin proyectos
-              </span>
-            )}
-          </form>
+          {projects ? (
+            <form action={selectProject} className="flex items-center gap-1.5 rounded-md border border-line bg-card px-[9px] py-[5px]">
+              <label htmlFor="proyecto-activo" className="text-[8.5px] tracking-[0.1em] text-mut2 uppercase">
+                Proyecto
+              </label>
+              {projects.length > 0 ? (
+                <select
+                  id="proyecto-activo"
+                  name="projectId"
+                  defaultValue={currentProjectId ?? undefined}
+                  key={currentProjectId ?? 'ninguno'}
+                  onChange={(event) => event.currentTarget.form?.requestSubmit()}
+                  className="max-w-[108px] cursor-pointer bg-card text-[12.5px] font-medium outline-none min-[881px]:max-w-[240px]"
+                >
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span id="proyecto-activo" className="text-[12.5px] text-mut">
+                  Sin proyectos
+                </span>
+              )}
+            </form>
+          ) : null}
           <div className="ml-auto flex items-center gap-2">
+            <div className="hidden text-right leading-tight min-[560px]:block">
+              <b className="block text-[12px] font-semibold">{user.fullName}</b>
+              <span className="text-[9.5px] tracking-[0.08em] text-mut2 uppercase">{user.roleLabel}</span>
+            </div>
+            <form action={signOut}>
+              <button type="submit" className="btn !px-2.5 !py-1 text-[11.5px]" title={`Cerrar la sesión de ${user.fullName}`}>
+                Cerrar sesión
+              </button>
+            </form>
             <button
               type="button"
               onClick={toggleTheme}
@@ -134,26 +165,28 @@ export function AppShell({
           </div>
         </header>
 
-        <nav
-          aria-label="Operación"
-          className="sticky top-[54px] z-29 flex gap-0.5 overflow-x-auto border-b border-line bg-card px-[22px]"
-        >
-          {TABS.map((tab) => {
-            const active = pathname.startsWith(tab.href);
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                aria-current={active ? 'page' : undefined}
-                className={`border-b-2 px-[13px] py-[11px] text-[10.5px] font-medium tracking-[0.07em] whitespace-nowrap uppercase ${
-                  active ? 'border-bl text-bl' : 'border-transparent text-mut hover:text-ink'
-                }`}
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {tabs.length > 0 ? (
+          <nav
+            aria-label="Pestañas del módulo"
+            className="sticky top-[54px] z-29 flex gap-0.5 overflow-x-auto border-b border-line bg-card px-[22px]"
+          >
+            {tabs.map((tab) => {
+              const active = pathname.startsWith(tab.href);
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  aria-current={active ? 'page' : undefined}
+                  className={`border-b-2 px-[13px] py-[11px] text-[10.5px] font-medium tracking-[0.07em] whitespace-nowrap uppercase ${
+                    active ? 'border-bl text-bl' : 'border-transparent text-mut hover:text-ink'
+                  }`}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </nav>
+        ) : null}
 
         <main className="w-full max-w-[1420px] p-4 min-[881px]:p-[22px]">{children}</main>
       </div>

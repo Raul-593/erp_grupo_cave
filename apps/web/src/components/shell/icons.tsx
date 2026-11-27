@@ -30,3 +30,13 @@ export function ThemeIcon() {
     </svg>
   );
 }
+
+export function UsersIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden className="size-[15px] flex-none opacity-85">
+      <circle cx="7.5" cy="7" r="2.8" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2.5 16c.6-2.7 2.6-4.2 5-4.2s4.4 1.5 5 4.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M13 4.6a2.6 2.6 0 0 1 0 5M14.6 12c1.6.5 2.6 1.8 3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}

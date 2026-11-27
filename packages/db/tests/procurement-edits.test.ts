@@ -219,6 +219,7 @@ describe('fotografías de evidencia', () => {
     sizeBytes: 2048,
     sha256: char.repeat(64),
     description: null,
+    uploadedBy: null,
     ...overrides,
   });
 

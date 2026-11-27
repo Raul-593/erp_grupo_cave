@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getSupplier } from '@erp/db';
 import { SupplierForm } from '@/components/forms/SupplierForm';
 import { Card, PageHeader } from '@/components/ui';
+import { requirePageUser } from '@/server/auth';
 import { db } from '@/server/db';
 
 export const metadata: Metadata = { title: 'Editar proveedor' };
@@ -10,6 +11,7 @@ export const metadata: Metadata = { title: 'Editar proveedor' };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function EditarProveedorPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageUser('catalogs.write');
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const supplier = await getSupplier(db(), id);

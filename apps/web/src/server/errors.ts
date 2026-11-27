@@ -6,6 +6,8 @@ const UNIQUE_MESSAGES: Record<string, string> = {
   companies_tax_id_key: 'Ya existe una empresa con ese RUC.',
   suppliers_name_key: 'Ya existe un proveedor con ese nombre.',
   purchase_orders_project_code_key: 'Ya existe una orden con ese código en este proyecto.',
+  app_users_email_key: 'Ya existe un usuario con ese correo.',
+  app_users_worker_id_key: 'Ese trabajador ya tiene un usuario.',
 };
 
 const RULE_MESSAGES: Record<BusinessRuleError['rule'], string> = {
@@ -34,6 +36,12 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
   purchase_order_lines_paid_amount_derived: 'Lo pagado de un ítem se calcula a partir de los pagos; no se escribe directamente.',
   payments_order_locked: RULE_MESSAGES.payment_has_allocations,
   payments_amount_covers_allocations: RULE_MESSAGES.allocation_exceeds_payment,
+  app_users_last_admin: 'Debe quedar al menos un superusuario activo. Activa o crea otro antes de cambiar este.',
+  app_users_no_delete: 'Los usuarios no se borran: se desactivan.',
+  app_users_field_requires_worker: 'Un empleado de campo debe estar vinculado a su trabajador.',
+  app_users_supplier_link: 'Solo un usuario de tipo proveedor se vincula a un proveedor, y siempre.',
+  app_users_supplier_no_worker: 'Un usuario de tipo proveedor no se vincula a un trabajador.',
+  audit_log_append_only: 'El historial de cambios no se modifica.',
 };
 
 /**

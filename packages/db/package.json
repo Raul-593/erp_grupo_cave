@@ -13,7 +13,8 @@
     "db:migrate:test": "node --env-file=../../.env scripts/migrate.ts --target=test",
     "db:status": "node --env-file=../../.env scripts/migrate.ts --status",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:users:example": "node --env-file=../../.env scripts/example-users.ts"
   },
   "dependencies": {
     "node-pg-migrate": "^9.0.0",

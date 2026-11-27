@@ -21,7 +21,15 @@ export type EvidenceUploadResult =
  */
 export async function uploadEvidence(
   deps: EvidenceUploadDeps,
-  input: { projectId: string; itemId: string; name: string; bytes: Uint8Array; description: string | null },
+  input: {
+    projectId: string;
+    itemId: string;
+    name: string;
+    bytes: Uint8Array;
+    description: string | null;
+    /** Usuario que sube la fotografía. */
+    uploadedBy: string | null;
+  },
 ): Promise<EvidenceUploadResult> {
   const checked = validateImage(input.bytes, deps.maxBytes);
   if (!checked.ok) return { ok: false, code: checked.error, message: IMAGE_ERROR_MESSAGES[checked.error](deps.maxBytes) };
@@ -49,6 +57,7 @@ export async function uploadEvidence(
       sizeBytes: input.bytes.length,
       sha256,
       description: input.description,
+      uploadedBy: input.uploadedBy,
     });
     return { ok: true, evidenceId, filename };
   } catch (error) {

@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listPreEventChecks, MOUNT_STATUSES } from '@erp/db';
 import { CheckResultSelect, MountSelect } from '@/components/operacion/inline';
-import { DemoBanner, Kpis, ModuleEmpty, ProductCell, RowList, StepDots } from '@/components/operacion/shared';
+import { DemoBanner, Kpis, ModuleEmpty, ProductCell, RowList, ScopeBanner, StepDots } from '@/components/operacion/shared';
 import { Card, EmptyState, Note, PageHeader, Pill } from '@/components/ui';
 import { formatDateTime } from '@/lib/format';
 import { CHECK_RESULT, ITEM_PAYMENT_STATUS } from '@/lib/labels';
+import { can } from '@/domain/access/permissions';
+import { requirePageUser } from '@/server/auth';
 import { getCurrentProject } from '@/server/current-project';
 import { db } from '@/server/db';
 import { loadMatrixView } from '@/server/matrix';
@@ -24,20 +26,28 @@ const MOUNTED_FROM = MOUNT_STATUSES.indexOf('mounted');
 const percent = (part: number, total: number) => (total === 0 ? undefined : `${Math.round((part / total) * 100)}%`);
 
 export default async function EjecucionPage() {
+  const user = await requirePageUser('schedule.read');
+  const canCreate = can(user.role, 'projects.write');
+  // El estado de pago es dato financiero: el empleado de campo no lo ve.
+  const showPayments = can(user.role, 'procurement.read');
+  const canUpload = can(user.role, 'evidence.upload');
   const project = await getCurrentProject();
-  if (!project) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="project" />;
-  const view = await loadMatrixView(project.id);
-  if (!view) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="matrix" />;
+  if (!project) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="project" canCreate={canCreate} />;
+  const view = await loadMatrixView(project.id, user);
+  if (!view) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="matrix" canCreate={canCreate} />;
 
-  const checks = await listPreEventChecks(db(), project.id);
+  // Con alcance (campo), solo los controles previos que tiene a cargo.
+  const checks = (await listPreEventChecks(db(), project.id)).filter((check) => !view.scoped || check.workerId === user.workerId);
   const { items, totals } = view;
-  // Sin fotografía y además sin ningún pago: lo que más urge revisar antes del evento.
-  const alerts = items.filter((item) => item.evidenceCount === 0 && item.paymentStatus === 'unpaid').length;
+  // Sin fotografía y además sin ningún pago: lo que más urge revisar antes del evento. Sin
+  // acceso a los pagos, la alerta es solo la falta de fotografía.
+  const alerts = items.filter((item) => item.evidenceCount === 0 && (!showPayments || item.paymentStatus === 'unpaid')).length;
 
   return (
     <>
       <PageHeader title={TITLE} subtitle={SUBTITLE} />
       {view.demo ? <DemoBanner source={view.matrix.model} /> : null}
+      {view.scoped ? <ScopeBanner count={items.length} /> : null}
       <Kpis
         items={[
           {
@@ -50,12 +60,16 @@ export default async function EjecucionPage() {
             value: `${totals.itemsWithEvidence} de ${totals.itemCount}`,
             hint: `${totals.evidenceCount} ${totals.evidenceCount === 1 ? 'fotografía' : 'fotografías'}`,
           },
-          {
-            label: 'Pagados por completo',
-            value: `${totals.fullyPaidCount} de ${totals.itemCount}`,
-            tone: totals.fullyPaidCount === totals.itemCount ? 'ok' : 'wa',
-          },
-          { label: 'Alertas', value: alerts, hint: 'sin foto y sin pagar', tone: alerts ? 'ba' : 'ok' },
+          ...(showPayments
+            ? [
+                {
+                  label: 'Pagados por completo',
+                  value: `${totals.fullyPaidCount} de ${totals.itemCount}`,
+                  tone: totals.fullyPaidCount === totals.itemCount ? ('ok' as const) : ('wa' as const),
+                },
+              ]
+            : []),
+          { label: 'Alertas', value: alerts, hint: showPayments ? 'sin foto y sin pagar' : 'sin foto', tone: alerts ? 'ba' : 'ok' },
         ]}
       />
 
@@ -66,7 +80,7 @@ export default async function EjecucionPage() {
               <tr>
                 <th scope="col">Ítem</th>
                 <th scope="col">Producto</th>
-                <th scope="col">Estado de pago</th>
+                {showPayments ? <th scope="col">Estado de pago</th> : null}
                 <th scope="col">Estado de montaje</th>
                 <th scope="col" className="num">
                   Fotos
@@ -88,9 +102,11 @@ export default async function EjecucionPage() {
                     <td>
                       <ProductCell producto={item.producto} secondary={item.supplierName} />
                     </td>
-                    <td>
-                      <Pill tone={payTone}>{payLabel}</Pill>
-                    </td>
+                    {showPayments ? (
+                      <td>
+                        <Pill tone={payTone}>{payLabel}</Pill>
+                      </td>
+                    ) : null}
                     <td>
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                         <StepDots done={step} total={MOUNT_STEPS} label="" />
@@ -103,10 +119,10 @@ export default async function EjecucionPage() {
                       <Link
                         href={`/operacion/ejecucion/${item.id}`}
                         className="btn"
-                        aria-label={`Fotografías del ítem ${item.code}: ${item.evidenceCount}. Ver y subir`}
+                        aria-label={`Fotografías del ítem ${item.code}: ${item.evidenceCount}. ${canUpload ? 'Ver y subir' : 'Ver'}`}
                       >
                         <span className={item.evidenceCount === 0 ? 'text-ba' : undefined}>{item.evidenceCount}</span>
-                        <span aria-hidden>◎ {item.evidenceCount === 0 ? 'Subir' : 'Ver'}</span>
+                        <span aria-hidden>◎ {item.evidenceCount === 0 && canUpload ? 'Subir' : 'Ver'}</span>
                       </Link>
                     </td>
                     <td>

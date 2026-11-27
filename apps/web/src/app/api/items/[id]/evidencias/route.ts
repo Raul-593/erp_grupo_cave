@@ -1,7 +1,8 @@
 import { revalidatePath } from 'next/cache';
-import { createEvidence, findEvidenceByHash, getItemProjectId, getPgErrorCode, PgErrorCode } from '@erp/db';
+import { createEvidence, findEvidenceByHash, getItemProjectId, getPgErrorCode, PgErrorCode, withTransaction } from '@erp/db';
 import { IMAGE_ERROR_MESSAGES } from '@/lib/image';
 import { textOrNull } from '@/lib/parse';
+import { audit, authorize } from '@/server/auth';
 import { db } from '@/server/db';
 import { toUserMessage } from '@/server/errors';
 import { isSameOrigin, jsonError, UUID } from '@/server/http';
@@ -17,6 +18,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!isSameOrigin(request)) return jsonError(403, 'Origen no permitido.');
   const { id } = await params;
   if (!UUID.test(id)) return jsonError(404, 'Ítem no encontrado.');
+  // Superusuario, o el empleado de campo responsable del ítem.
+  const auth = await authorize('evidence.upload', { itemId: id });
+  if (!auth.ok) return jsonError(auth.status, auth.message);
 
   const maxBytes = maxEvidenceBytes();
   const tooLarge = () => jsonError(413, IMAGE_ERROR_MESSAGES.too_large(maxBytes));
@@ -49,10 +53,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         storage: fileStorage(),
         maxBytes,
         findByHash: (itemId, sha256) => findEvidenceByHash(db(), itemId, sha256),
-        create: (input) => createEvidence(db(), input),
+        create: (input) =>
+          withTransaction(db(), async (tx) => {
+            const evidenceId = await createEvidence(tx, input);
+            await audit(tx, auth.user, 'evidence.upload', 'item_evidences', evidenceId, { itemId: id, filename: input.originalFilename });
+            return evidenceId;
+          }),
         isUniqueViolation: (error) => getPgErrorCode(error) === PgErrorCode.uniqueViolation,
       },
-      { projectId, itemId: id, name: file.name, bytes: new Uint8Array(await file.arrayBuffer()), description },
+      {
+        projectId,
+        itemId: id,
+        name: file.name,
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        description,
+        uploadedBy: auth.user.id,
+      },
     );
     if (!result.ok) return jsonError(result.code === 'too_large' ? 413 : result.code === 'duplicate' ? 409 : 400, result.message);
 

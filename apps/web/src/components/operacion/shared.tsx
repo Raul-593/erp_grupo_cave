@@ -51,18 +51,47 @@ export function DemoBanner({ source }: { source: string }) {
   );
 }
 
-/** Pantalla de un módulo que todavía no tiene de dónde leer. */
-export function ModuleEmpty({ title, subtitle, reason }: { title: string; subtitle: string; reason: 'project' | 'matrix' }) {
+/** Aviso para el empleado de campo: la pantalla muestra solo sus ítems. */
+export function ScopeBanner({ count }: { count: number }) {
+  return (
+    <div role="note" className="mb-[18px] rounded-md bg-bl2 px-[13px] py-[11px] text-xs leading-[1.6] text-ink2">
+      <b className="font-semibold text-bl">Tus ítems.</b> Ves solo {count === 1 ? 'el ítem' : `los ${count} ítems`} de este proyecto donde
+      eres responsable, y sus indicadores.
+    </div>
+  );
+}
+
+/**
+ * Pantalla de un módulo que todavía no tiene de dónde leer. Sin `canCreate`, el usuario no
+ * puede crear proyectos (empleado de campo o contabilidad) y no se le ofrece.
+ */
+export function ModuleEmpty({
+  title,
+  subtitle,
+  reason,
+  canCreate = true,
+}: {
+  title: string;
+  subtitle: string;
+  reason: 'project' | 'matrix';
+  canCreate?: boolean;
+}) {
   return (
     <>
       <PageHeader title={title} subtitle={subtitle} />
       <Card>
         {reason === 'project' ? (
-          <EmptyState icon="◫" title="Todavía no hay proyectos">
-            <p>Crea un proyecto y su contratante para empezar.</p>
-            <Link href="/operacion/proyectos/nuevo" className="btn btn-p mt-4">
-              + Nuevo proyecto
-            </Link>
+          <EmptyState icon="◫" title={canCreate ? 'Todavía no hay proyectos' : 'No tienes proyectos asignados'}>
+            {canCreate ? (
+              <>
+                <p>Crea un proyecto y su contratante para empezar.</p>
+                <Link href="/operacion/proyectos/nuevo" className="btn btn-p mt-4">
+                  + Nuevo proyecto
+                </Link>
+              </>
+            ) : (
+              <p>Aquí aparecerán los proyectos donde seas responsable de algún ítem.</p>
+            )}
           </EmptyState>
         ) : (
           <EmptyState icon="▦" title="El proyecto no tiene una matriz confirmada">
