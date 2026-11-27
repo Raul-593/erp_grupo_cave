@@ -1,4 +1,5 @@
 import { BusinessRuleError, DbConfigError, getPgErrorCode, PgErrorCode, VersionConflictError } from '@erp/db';
+import { RAISE_COST_FIRST } from '@/lib/constants';
 
 const UNIQUE_MESSAGES: Record<string, string> = {
   clients_tax_id_key: 'Ya existe un contratante con ese RUC o cédula.',
@@ -8,13 +9,31 @@ const UNIQUE_MESSAGES: Record<string, string> = {
 };
 
 const RULE_MESSAGES: Record<BusinessRuleError['rule'], string> = {
-  paid_exceeds_amount: 'Lo pagado no puede superar el costo del ítem en la orden.',
-  line_has_payments: 'El ítem ya tiene un valor pagado: pon lo pagado en cero antes de quitarlo de la orden.',
+  paid_exceeds_amount: 'El costo no puede quedar por debajo de lo que ya se le pagó al ítem.',
+  line_has_payments:
+    'El ítem tiene pagos repartidos. Quita antes su parte en esos pagos (botón «Editar» de cada pago) y después cámbialo o quítalo de la orden.',
+  allocation_exceeds_balance: `Un ítem recibiría más que su costo en la orden. ${RAISE_COST_FIRST}`,
+  allocation_exceeds_payment: 'El reparto entre los ítems suma más que el monto del pago.',
+  allocation_other_order: 'Uno de los ítems ya no pertenece a la orden del pago. Recarga la página.',
+  payment_has_allocations:
+    'Este pago ya está repartido entre ítems de su orden. Guárdalo primero sin reparto (importes en blanco) y después cámbialo de orden.',
 };
 
 /** Mensajes de las reglas que la base aplica con triggers (por nombre de tabla). */
 const CHECK_MESSAGES: Record<string, string> = {
   tdr_item_assignments: 'Ese trabajador está desactivado y no puede ser responsable.',
+};
+
+/** Reglas del reparto de pagos que la base aplica por su cuenta (migración 0008), por nombre de restricción. */
+const CONSTRAINT_MESSAGES: Record<string, string> = {
+  payment_allocations_same_order: RULE_MESSAGES.allocation_other_order,
+  payment_allocations_within_payment: RULE_MESSAGES.allocation_exceeds_payment,
+  payment_allocations_within_line: RULE_MESSAGES.allocation_exceeds_balance,
+  purchase_order_lines_paid_within_amount: RULE_MESSAGES.paid_exceeds_amount,
+  purchase_order_lines_order_locked: RULE_MESSAGES.line_has_payments,
+  purchase_order_lines_paid_amount_derived: 'Lo pagado de un ítem se calcula a partir de los pagos; no se escribe directamente.',
+  payments_order_locked: RULE_MESSAGES.payment_has_allocations,
+  payments_amount_covers_allocations: RULE_MESSAGES.allocation_exceeds_payment,
 };
 
 /**
@@ -48,6 +67,7 @@ export function toUserMessage(error: unknown): string {
     case PgErrorCode.restrictViolation:
       return 'No se puede eliminar porque tiene información relacionada.';
     case PgErrorCode.checkViolation:
+      if (constraint && CONSTRAINT_MESSAGES[constraint]) return CONSTRAINT_MESSAGES[constraint];
       if (!constraint && table && CHECK_MESSAGES[table]) return CHECK_MESSAGES[table];
       return 'Algún dato no cumple las reglas del sistema. Revisa los campos.';
     default:

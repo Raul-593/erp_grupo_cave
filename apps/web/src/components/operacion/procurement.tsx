@@ -1,15 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useActionState, useState, type ReactNode } from 'react';
-import { Field, fieldProps } from '@/components/forms/fields';
 import { FormMessage } from '@/components/ui';
 import { IDLE } from '@/lib/action-state';
-import { PAYMENT_METHOD, PAYMENT_SUPPORT } from '@/lib/labels';
-import { changeItemOrder, createOrder, removePayment, savePayment, updateOrderLineField } from '@/server/actions/procurement';
+import { changeItemOrder, createOrder, removePayment, updateOrderLineField } from '@/server/actions/procurement';
 import { amountText, InlineError, SELECT_CLASS, useInlineSave, withCurrent, type Option } from './inline';
 
-type LineField = 'orderId' | 'amount' | 'paidAmount' | 'paymentWorkerId';
+type LineField = 'orderId' | 'amount' | 'paymentWorkerId';
 
 /** Campo de importe que guarda al salir o con Enter (Esc cancela). */
 function AmountField({
@@ -62,9 +59,9 @@ function AmountField({
 }
 
 /**
- * Celdas editables de un ítem en «Órdenes por entregable»: orden, responsable de compra (solo
- * lectura), responsable de pago, costo, pagado, saldo y estado. Sin orden, solo se puede elegir
- * una; el costo mostrado es el asignado en Planificación.
+ * Celdas de un ítem en «Órdenes por entregable»: orden, responsable de compra (solo lectura),
+ * responsable de pago, costo, pagado (calculado de los pagos; solo lectura), saldo y estado. Sin
+ * orden, solo se puede elegir una; el costo mostrado es el asignado en Planificación.
  */
 export function OrderCells({
   itemId,
@@ -73,7 +70,7 @@ export function OrderCells({
   orders,
   lineVersion,
   amount,
-  paidAmount,
+  paidText,
   plannedCostText,
   balanceText,
   paymentWorkerId,
@@ -89,7 +86,8 @@ export function OrderCells({
   orders: Option[];
   lineVersion: number | null;
   amount: string | null;
-  paidAmount: string | null;
+  /** Lo pagado ya formateado: suma de lo que los pagos le reparten al ítem. */
+  paidText: string;
   /** Costo asignado ya formateado, para los ítems sin orden. */
   plannedCostText: string;
   balanceText: string;
@@ -105,7 +103,7 @@ export function OrderCells({
   const ordered = lineVersion !== null;
   const version = ordered ? String(lineVersion) : '';
   const shown = (field: string, saved: string) => (pending && draft.field === field ? draft.value : saved);
-  const sendLine = (field: 'amount' | 'paidAmount' | 'paymentWorkerId', value: string) => {
+  const sendLine = (field: 'amount' | 'paymentWorkerId', value: string) => {
     setDraft({ field, value });
     save(field, () => updateOrderLineField({ itemId, version, field, value }));
   };
@@ -176,24 +174,7 @@ export function OrderCells({
           plannedCostText
         )}
       </td>
-      <td className="num">
-        {ordered ? (
-          <>
-            <AmountField
-              label={`Pagado del ítem ${itemLabel}`}
-              saved={amountText(paidAmount)}
-              disabled={pending}
-              invalid={error?.field === 'paidAmount'}
-              symbol={currencySymbol}
-              resetKey={rejections}
-              onSave={(value) => sendLine('paidAmount', value)}
-            />
-            <InlineError message={message('paidAmount')} />
-          </>
-        ) : (
-          <span className="text-mut">—</span>
-        )}
-      </td>
+      <td className="num">{ordered ? paidText : <span className="text-mut">—</span>}</td>
       <td className="num">{balanceText}</td>
       <td>{status}</td>
     </>
@@ -251,70 +232,3 @@ export function DeletePaymentButton({ id, version, summary }: { id: string; vers
   );
 }
 
-/** Alta y edición de un pago contra una orden. */
-export function PaymentForm({ orders, initial }: { orders: Option[]; initial?: Record<string, string> }) {
-  const [state, action, pending] = useActionState(savePayment, IDLE);
-  const values = state.values ?? initial ?? { method: 'transfer', support: 'invoice_and_receipt' };
-  const errors = state.fieldErrors;
-  const editing = Boolean(initial?.['id']);
-
-  return (
-    <form action={action} className="grid gap-4 p-4 md:grid-cols-2" noValidate>
-      {editing ? (
-        <>
-          <input type="hidden" name="id" value={initial?.['id']} />
-          <input type="hidden" name="version" value={initial?.['version']} />
-        </>
-      ) : null}
-      <Field name="orderId" label="Orden" errors={errors}>
-        <select {...fieldProps('orderId', values, errors)}>
-          <option value="">Selecciona…</option>
-          {orders.map((order) => (
-            <option key={order.id} value={order.id}>
-              {order.name}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field name="paidOn" label="Fecha del pago" errors={errors}>
-        <input type="date" {...fieldProps('paidOn', values, errors)} />
-      </Field>
-      <Field name="concept" label="Concepto" errors={errors} className="md:col-span-2">
-        <input {...fieldProps('concept', values, errors)} maxLength={200} autoComplete="off" />
-      </Field>
-      <Field name="amount" label="Monto" errors={errors} hint="Por ejemplo 8.400,50">
-        <input {...fieldProps('amount', values, errors)} inputMode="decimal" autoComplete="off" />
-      </Field>
-      <Field name="method" label="Forma de pago" errors={errors}>
-        <select {...fieldProps('method', values, errors)}>
-          {Object.entries(PAYMENT_METHOD).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field name="support" label="Respaldo" errors={errors}>
-        <select {...fieldProps('support', values, errors)}>
-          {Object.entries(PAYMENT_SUPPORT).map(([value, [label]]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <div className="flex flex-wrap items-center gap-3 md:col-span-2">
-        <button type="submit" className="btn btn-p" disabled={pending}>
-          {pending ? 'Guardando…' : editing ? 'Guardar cambios' : 'Registrar pago'}
-        </button>
-        <Link href="/operacion/abastecimiento" className="btn">
-          Cancelar
-        </Link>
-        <FormMessage status={state.status} message={state.message} />
-      </div>
-      <p className="text-[11.5px] text-mut md:col-span-2">
-        Registrar un pago no cambia lo pagado de cada ítem: ese valor se escribe en la tabla «Órdenes por entregable».
-      </p>
-    </form>
-  );
-}

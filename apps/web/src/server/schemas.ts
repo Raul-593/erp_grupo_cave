@@ -12,7 +12,8 @@ import {
   PAYMENT_SUPPORTS,
   SUPPLIER_KINDS,
 } from '@erp/db';
-import { NEW_CLIENT } from '@/lib/constants';
+import { ALLOCATION_PREFIX, NEW_CLIENT } from '@/lib/constants';
+import { compareAmounts, sumAmounts } from '@/lib/money';
 import { longTextOrNull, parseDecimal, parseList, textOrNull } from '@/lib/parse';
 
 export { NEW_CLIENT };
@@ -249,10 +250,9 @@ export const itemOrderChangeSchema = z.object({
 });
 
 const lineTarget = { itemId: uuid('Ítem'), version };
-/** Un campo de la línea de una orden: monto, pagado o responsable de pago. */
+/** Un campo de la línea de una orden: monto o responsable de pago. Lo pagado se calcula de los pagos. */
 export const orderLineChangeSchema = z.discriminatedUnion('field', [
   z.object({ ...lineTarget, field: z.literal('amount'), value: requiredAmount('Costo') }),
-  z.object({ ...lineTarget, field: z.literal('paidAmount'), value: requiredAmount('Pagado') }),
   z.object({ ...lineTarget, field: z.literal('paymentWorkerId'), value: optionalId('Responsable de pago') }),
 ]);
 
@@ -269,6 +269,47 @@ export const paymentFormSchema = z.object({
   amount: requiredAmount('Monto').refine((v) => Number(v) > 0, 'Monto: debe ser mayor que cero.'),
   support: z.enum(PAYMENT_SUPPORTS, 'Selecciona el respaldo.'),
 });
+
+export interface PaymentAllocationsResult {
+  /** Ítems con importe mayor que cero, en el orden en que llegaron. */
+  allocations: { itemId: string; amount: string }[];
+  /** Errores por campo (`reparto:<ítem>`). */
+  fieldErrors: FieldErrors;
+  /** Error del reparto en conjunto: suma mayor que el monto del pago. */
+  message: string | null;
+}
+
+/**
+ * Reparto de un pago entre ítems: campos `reparto:<id del ítem>` del formulario. Vacío o cero
+ * significa que ese ítem no recibe nada; el reparto puede sumar menos que el monto del pago
+ * (queda «sin repartir»), pero nunca más. `paymentAmount` es el monto ya validado, o null.
+ */
+export function parsePaymentAllocations(values: Record<string, string>, paymentAmount: string | null): PaymentAllocationsResult {
+  const allocations: PaymentAllocationsResult['allocations'] = [];
+  const errors: FieldErrors = {};
+  const amountSchema = optionalAmount('Importe');
+  for (const [key, raw] of Object.entries(values)) {
+    if (!key.startsWith(ALLOCATION_PREFIX)) continue;
+    const itemId = key.slice(ALLOCATION_PREFIX.length);
+    if (!z.string().uuid().safeParse(itemId).success) {
+      errors[key] = ['Ítem no válido.'];
+      continue;
+    }
+    const parsed = amountSchema.safeParse(raw);
+    if (!parsed.success) {
+      errors[key] = [firstIssue(parsed.error)];
+      continue;
+    }
+    if (parsed.data !== null && compareAmounts(parsed.data, '0') > 0) allocations.push({ itemId, amount: parsed.data });
+  }
+  const total = sumAmounts(allocations.map((allocation) => allocation.amount));
+  const exceeds = Object.keys(errors).length === 0 && paymentAmount !== null && compareAmounts(total, paymentAmount) > 0;
+  return {
+    allocations,
+    fieldErrors: errors,
+    message: exceeds ? 'El reparto entre los ítems suma más que el monto del pago. Baja algún importe o sube el monto.' : null,
+  };
+}
 
 /** Primer mensaje de error de un resultado fallido de zod, para ediciones de un solo campo. */
 export function firstIssue(error: z.ZodError): string {

@@ -87,7 +87,7 @@ function dataset(): DemoDataset {
         observacion: null,
         responsible: 'Persona Uno',
         plan: { supplier: 'Proveedor Uno', cost: 100, contract: 'signed' },
-        order: { code: 'OC-1', amount: 100, paid: 50, paidBy: 'Persona Dos' },
+        order: { code: 'OC-1', amount: 100, paidBy: 'Persona Dos' },
         mountStatus: 'mounted',
       },
       {
@@ -102,7 +102,7 @@ function dataset(): DemoDataset {
         observacion: 'Observación B',
         responsible: 'Persona Uno',
         plan: { supplier: 'Proveedor Grupo', cost: 200.25, contract: 'signed' },
-        order: { code: 'OC-1', amount: 200.25, paid: 200.25, paidBy: 'Persona Dos' },
+        order: { code: 'OC-1', amount: 200.25, paidBy: 'Persona Dos' },
         mountStatus: 'on_site',
       },
       {
@@ -117,7 +117,7 @@ function dataset(): DemoDataset {
         observacion: null,
         responsible: 'Persona Dos',
         plan: { supplier: 'Proveedor Uno', cost: 300, contract: 'pending' },
-        order: { code: 'OC-2', amount: 300, paid: 0, paidBy: null },
+        order: { code: 'OC-2', amount: 300, paidBy: null },
         mountStatus: 'in_warehouse',
       },
       {
@@ -137,8 +137,20 @@ function dataset(): DemoDataset {
       },
     ],
     payments: [
-      { order: 'OC-1', paidOn: '2026-12-02', concept: 'Anticipo', method: 'transfer', amount: 250.25, support: 'invoice_and_receipt' },
-      { order: 'OC-2', paidOn: '2026-12-01', concept: 'Flete', method: 'cash', amount: 10, support: 'none' },
+      {
+        order: 'OC-1',
+        paidOn: '2026-12-02',
+        concept: 'Anticipo',
+        method: 'transfer',
+        amount: 250.25,
+        support: 'invoice_and_receipt',
+        allocations: [
+          { item: 'a', amount: 50 },
+          { item: 'b', amount: 200.25 },
+        ],
+      },
+      // Pago sin repartir: no cambia lo pagado de ningún ítem.
+      { order: 'OC-2', paidOn: '2026-12-01', concept: 'Flete', method: 'cash', amount: 10, support: 'none', allocations: [] },
     ],
     activities: [
       {
@@ -263,6 +275,7 @@ describe('carga de la demostración', () => {
       purchase_order_lines: 3,
       item_execution: 3,
       payments: 2,
+      payment_allocations: 2,
       activities: 3,
       activity_items: 3,
       pre_event_checks: 2,
@@ -354,6 +367,8 @@ describe('carga de la demostración', () => {
       unorderedCost: '40.00',
       outstandingAmount: '390.00',
       holdingAmount: '200.25',
+      paymentsAmount: '260.25',
+      unallocatedPayments: '10.00',
       fullyPaidCount: 1,
       mountedCount: 1,
       itemsWithEvidence: 0,
@@ -379,9 +394,14 @@ describe('carga de la demostración', () => {
     });
     expect(activities[2]).toMatchObject({ wholeTeam: true, isMilestone: true, workerName: null, status: null, itemIds: [] });
 
-    expect((await listPayments(client, projectId)).map((p) => [p.paidOn, p.orderCode, p.method, p.amount, p.support])).toEqual([
+    const payments = await listPayments(client, projectId);
+    expect(payments.map((p) => [p.paidOn, p.orderCode, p.method, p.amount, p.support])).toEqual([
       ['2026-12-01', 'OC-2', 'cash', '10.00', 'none'],
       ['2026-12-02', 'OC-1', 'transfer', '250.25', 'invoice_and_receipt'],
+    ]);
+    expect(payments.map((p) => [p.allocatedAmount, p.unallocatedAmount, p.itemIds])).toEqual([
+      ['0.00', '10.00', []],
+      ['250.25', '0.00', [id('Producto A'), id('Producto B')]],
     ]);
 
     const checks = await listPreEventChecks(client, projectId);
@@ -429,6 +449,10 @@ describe('carga de la demostración', () => {
     const repeated = dataset();
     repeated.items[1]!.key = 'A';
     await expect(seedDemo(client, options(projectId, repeated))).rejects.toThrow(/repetido/);
+    // Un pago solo se reparte entre ítems de su propia orden.
+    const foreign = dataset();
+    foreign.payments[1]!.allocations = [{ item: 'a', amount: 5 }];
+    await expect(seedDemo(client, options(projectId, foreign))).rejects.toThrow(/no es de la orden OC-2/);
     await expect(seedDemo(client, options('00000000-0000-4000-8000-000000000000'))).rejects.toThrow(/no existe/);
     expect(await findDemoExtraction(client, projectId)).toBeNull();
   });

@@ -60,6 +60,7 @@ export interface MatrixItem {
   orderId: string | null;
   orderCode: string | null;
   orderAmount: string | null;
+  /** Suma de lo que los pagos le reparten al ítem (valor calculado por la base). */
   paidAmount: string | null;
   balance: string | null;
   paymentStatus: ItemPaymentStatus;
@@ -126,6 +127,10 @@ export interface MatrixTotals {
   /** Por pagar en total: saldo de las órdenes más lo que aún no tiene orden. */
   outstandingAmount: string;
   holdingAmount: string;
+  /** Total de los pagos registrados contra las órdenes del proyecto. */
+  paymentsAmount: string;
+  /** Parte de esos pagos que todavía no está repartida entre ítems. */
+  unallocatedPayments: string;
   fullyPaidCount: number;
   mountedCount: number;
   itemsWithEvidence: number;
@@ -145,6 +150,15 @@ export async function getMatrixTotals(db: Queryable, extractionId: string): Prom
          LEFT JOIN purchase_order_lines l ON l.tdr_item_id = i.id
          LEFT JOIN item_execution e ON e.tdr_item_id = i.id
         WHERE i.extraction_id = $1
+     ), payment AS (
+       SELECT p.amount,
+              COALESCE((SELECT sum(a.amount) FROM payment_allocations a WHERE a.payment_id = p.id), 0) AS allocated
+         FROM payments p
+         JOIN purchase_orders o ON o.id = p.purchase_order_id
+        WHERE o.project_id = (SELECT d.project_id
+                                FROM tdr_extractions x
+                                JOIN tdr_documents d ON d.id = x.tdr_document_id
+                               WHERE x.id = $1)
      )
      SELECT count(*)::int AS "itemCount",
             count(DISTINCT rubro)::int AS "rubroCount",
@@ -161,6 +175,8 @@ export async function getMatrixTotals(db: Queryable, extractionId: string): Prom
             COALESCE(sum(CASE WHEN line_id IS NULL THEN planned_cost ELSE amount - paid_amount END), 0)::numeric(14,2)
               AS "outstandingAmount",
             COALESCE(sum(amount) FILTER (WHERE kind = 'holding'), 0)::numeric(14,2) AS "holdingAmount",
+            (SELECT COALESCE(sum(amount), 0)::numeric(14,2) FROM payment) AS "paymentsAmount",
+            (SELECT COALESCE(sum(amount - allocated), 0)::numeric(14,2) FROM payment) AS "unallocatedPayments",
             (count(*) FILTER (WHERE line_id IS NOT NULL AND paid_amount > 0 AND paid_amount >= amount))::int AS "fullyPaidCount",
             (count(*) FILTER (WHERE mount_status IN ('mounted', 'tested', 'in_event', 'dismounted')))::int AS "mountedCount",
             (count(*) FILTER (WHERE evidences > 0))::int AS "itemsWithEvidence",

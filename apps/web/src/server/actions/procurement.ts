@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
+  BusinessRuleError,
   createPayment,
   createPurchaseOrder,
   deletePayment,
@@ -12,10 +13,13 @@ import {
   setItemOrder,
   updateOrderLine,
   updatePayment,
+  withTransaction,
 } from '@erp/db';
 import { formValues, type ActionState, type InlineResult } from '@/lib/action-state';
+import { ALLOCATION_PREFIX, RAISE_COST_FIRST } from '@/lib/constants';
 import { db } from '../db';
 import { toUserMessage } from '../errors';
+import { loadMatrixView } from '../matrix';
 import {
   fieldErrors,
   firstIssue,
@@ -23,6 +27,7 @@ import {
   itemOrderChangeSchema,
   orderFormSchema,
   orderLineChangeSchema,
+  parsePaymentAllocations,
   paymentFormSchema,
   versionSchema,
 } from '../schemas';
@@ -66,7 +71,7 @@ export async function changeItemOrder(input: unknown): Promise<InlineResult> {
   return { ok: true };
 }
 
-/** Guarda el costo, lo pagado o el responsable de pago de un ítem dentro de su orden. */
+/** Guarda el costo o el responsable de pago de un ítem dentro de su orden. */
 export async function updateOrderLineField(input: unknown): Promise<InlineResult> {
   const parsed = orderLineChangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
@@ -80,23 +85,43 @@ export async function updateOrderLineField(input: unknown): Promise<InlineResult
   return { ok: true };
 }
 
-/** Registra un pago o corrige uno existente. */
+/**
+ * Registra un pago o corrige uno existente, junto con su reparto entre los ítems de la orden.
+ * Lo pagado de cada ítem se recalcula en la misma transacción.
+ */
 export async function savePayment(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const values = formValues(formData);
   const parsed = paymentFormSchema.safeParse(values);
-  if (!parsed.success) {
-    return { status: 'error', message: 'Revisa los campos marcados.', fieldErrors: fieldErrors(parsed.error), values };
+  const split = parsePaymentAllocations(values, parsed.success ? parsed.data.amount : null);
+  const invalid = { ...(parsed.success ? {} : fieldErrors(parsed.error)), ...split.fieldErrors };
+  if (!parsed.success || Object.keys(invalid).length > 0) {
+    return { status: 'error', message: 'Revisa los campos marcados.', fieldErrors: invalid, values };
   }
+  if (split.message) return { status: 'error', message: split.message, values };
+
+  const input = { ...parsed.data, allocations: split.allocations };
+  let projectId: string | null = null;
   try {
-    if ((await getPurchaseOrderProjectId(db(), parsed.data.orderId)) === null) {
-      return { status: 'error', message: 'La orden ya no existe. Recarga la página.', values };
-    }
-    if (values['id']) {
-      await updatePayment(db(), idSchema('Pago').parse(values['id']), versionSchema.parse(values['version']), parsed.data);
-    } else {
-      await createPayment(db(), parsed.data);
-    }
+    projectId = await getPurchaseOrderProjectId(db(), input.orderId);
+    if (projectId === null) return { status: 'error', message: 'La orden ya no existe. Recarga la página.', values };
+    await withTransaction(db(), async (tx) => {
+      if (values['id']) {
+        await updatePayment(tx, idSchema('Pago').parse(values['id']), versionSchema.parse(values['version']), input);
+      } else {
+        await createPayment(tx, input);
+      }
+    });
   } catch (error) {
+    // R-3: se indica qué ítem recibiría de más y que primero hay que subir su costo.
+    if (error instanceof BusinessRuleError && error.rule === 'allocation_exceeds_balance' && error.itemId && projectId) {
+      const code = (await loadMatrixView(projectId).catch(() => null))?.codes.get(error.itemId);
+      return {
+        status: 'error',
+        message: `No se guardó el pago: ${code ? `el ítem ${code}` : 'un ítem'} recibiría más que su costo en la orden. ${RAISE_COST_FIRST}`,
+        fieldErrors: { [`${ALLOCATION_PREFIX}${error.itemId}`]: ['Supera el saldo del ítem. Primero sube su costo en la orden.'] },
+        values,
+      };
+    }
     return { status: 'error', message: toUserMessage(error), values };
   }
   revalidatePath('/operacion', 'layout');
@@ -110,7 +135,8 @@ export async function removePayment(input: unknown): Promise<InlineResult> {
   const version = versionSchema.safeParse(candidate['version']);
   if (!id.success || !version.success) return { ok: false, message: 'Pago no válido.' };
   try {
-    await deletePayment(db(), id.data, version.data);
+    // Borra también su reparto: lo pagado de sus ítems baja en la misma transacción.
+    await withTransaction(db(), (tx) => deletePayment(tx, id.data, version.data));
   } catch (error) {
     return { ok: false, message: toUserMessage(error) };
   }

@@ -55,12 +55,12 @@ No implementar estos módulos de manera anticipada, fuera de la excepción sigui
 
 ### Vista previa con datos de demostración (decisión del usuario, 2026-11-26)
 
-Mientras no haya clave de API, el usuario pidió seguir avanzando con los datos ilustrativos del prototipo. Excepción acotada al alcance anterior (detalle y etapas en `PLAN.md`):
+Mientras no haya clave de API, el usuario pidió seguir avanzando con los datos ilustrativos del prototipo. Excepción acotada al alcance anterior (tarea completada; su detalle y etapas están en el historial de Git de `PLAN.md`, commit `d039613`):
 
 - Los datos que el prototipo muestra en Operación › Requerimiento, Planificación, Abastecimiento y Ejecución se cargan **solo en el proyecto 1 del entorno local**, mediante un script idempotente (no una migración). Entran como un documento de demostración con una extracción de proveedor `demo`, ya confirmada, y se rotulan «Datos de demostración» en pantalla. No son datos de un TDR real ni referencia de precios.
 - El archivo con esos datos (nombres de personas y montos) no se versiona; el script sí.
 - Planificación, Abastecimiento y Ejecución leen de la base y los indicadores se calculan siempre a partir de las filas guardadas; no se guardan totales literales del prototipo.
-- **Edición desde las pantallas (decisión del usuario, 2026-11-27; detalle en `PLAN.md`, E8):** responsable por ítem; proveedor, costo y contrato por ítem; catálogo mínimo de proveedores; estados de actividades, de montaje y del checklist previo; órdenes y pagos. Lo pagado por ítem se registra a mano por ahora; su cálculo a partir de los pagos requiere una migración posterior. Cada cambio se valida en el servidor y usa control de versión. No hay historial de cambios hasta que exista autenticación (Fase 3).
+- **Edición desde las pantallas (decisión del usuario, 2026-11-27):** responsable por ítem; proveedor, costo y contrato por ítem; catálogo mínimo de proveedores; estados de actividades, de montaje y del checklist previo; órdenes y pagos. Lo pagado por ítem no se escribe: es la suma de lo que los pagos reparten entre los ítems de su orden (decisión del usuario, 2026-11-27; `PLAN.md`, «reparto de pagos»). Un pago puede quedar repartido solo en parte, a un ítem no se le paga más que su costo (primero se sube el costo) y un pago o un ítem con reparto no cambia de orden. Cada cambio se valida en el servidor y usa control de versión. No hay historial de cambios hasta que exista autenticación (Fase 3).
 - Desde Ejecución se pueden **subir, ver y eliminar fotografías por ítem** (adelanto parcial de la Fase 7). Las fotografías del prototipo no existen como archivos y no se fabrican.
 - El modelo de órdenes, pagos y costos es provisional y se rediseña en la Fase 6.
 
@@ -75,7 +75,7 @@ Mientras no haya clave de API, el usuario pidió seguir avanzando con los datos 
 | Almacenamiento de archivos en producción previsto | Supabase Storage, con buckets privados |
 | Inteligencia artificial | Multiproveedor mediante una conexión común (interfaz de proveedor con un adaptador por compañía: OpenAI, Anthropic, Google u otros). Proveedor y modelo configurables; no se restringe a un solo modelo ni a una sola compañía |
 | Hosting existente | Netlify y dominio de la empresa |
-| Frontend | React/Next.js (versiones y librerías de interfaz: ver `PLAN.md`, tarea 1.0b) |
+| Frontend | React/Next.js (versiones y librerías de interfaz: las instaladas en `apps/web/package.json`) |
 | Referencia visual | Prototipo HTML `CAVE-ERP-v3` entregado por el usuario (fuera del repositorio); ver §6, «Guía visual» |
 | Backend | Node.js |
 | Lenguaje y gestor de paquetes | TypeScript; pnpm (workspace con `packages/*` y `apps/*`) |
@@ -195,20 +195,22 @@ La interfaz reproduce el estilo del prototipo `CAVE-ERP-v3`. Se toma su diseño,
 
 ### Modelo de datos
 
-Migraciones `0001`–`0005` aplicadas (subfase 1.1) con `clients`, `events`, `tdr_documents`, `tdr_extractions` y `tdr_items`. Los cambios de la terminología de §1 se proponen en una migración nueva (`0006`, ver `PLAN.md`); las migraciones aplicadas no se editan.
+Migraciones `0001`–`0008` aplicadas en `erp` y `erp_test`. `0001`–`0005` (subfase 1.1) crearon `clients`, `events`, `tdr_documents`, `tdr_extractions` y `tdr_items`; `0006` aplicó la terminología de §1 (renombró `events` a `projects` y añadió empresas, trabajadores y responsables). Las migraciones aplicadas no se editan: todo cambio va en una migración nueva.
 
 | Entidad | Responsabilidad | Estado |
 | --- | --- | --- |
-| `companies` | Empresas del holding que ejecutan proyectos | Propuesta (`0006`); sin interfaz en Fase 1 |
+| `companies` | Empresas del holding que ejecutan proyectos | Existente (`0006`); sin interfaz en Fase 1 |
 | `clients` | Contratantes | Existente |
-| `projects` | Proyectos de un contratante, opcionalmente de una empresa; datos de la ficha del proyecto | Propuesta (`0006`): renombrar `events` y añadir columnas de la ficha |
-| `tdr_documents` | Metadatos y referencia del PDF original asociado al proyecto | Existente (`event_id` pasaría a `project_id`) |
+| `projects` | Proyectos de un contratante, opcionalmente de una empresa; datos de la ficha del proyecto | Existente (`0006`: antes `events`; incluye las columnas de la ficha) |
+| `tdr_documents` | Metadatos y referencia del PDF original asociado al proyecto | Existente (referencia al proyecto con `project_id`) |
 | `tdr_extractions` | Cada intento de procesamiento: estado, proveedor, modelo, versión de prompt, respuesta original JSONB y errores controlados | Existente |
-| `tdr_items` | Filas editables y confirmadas vinculadas a una extracción | Existente (añadir `rubro`) |
-| `workers` | Trabajadores que pueden ser responsables de un ítem (nombre, cargo, activo) | Propuesta (`0006`) |
-| `tdr_item_assignments` | Responsable único de cada ítem | Propuesta (`0006`) |
+| `tdr_items` | Filas editables y confirmadas vinculadas a una extracción | Existente (con `rubro` desde `0006`) |
+| `workers` | Trabajadores que pueden ser responsables de un ítem (nombre, cargo, activo) | Existente (`0006`) |
+| `tdr_item_assignments` | Responsable único de cada ítem | Existente (`0006`) |
 
 Tablas de la migración `0007` (vista previa de §2; modelo financiero provisional hasta la Fase 6): `suppliers` (proveedores), `item_plans` (proveedor adjudicado, costo y contrato por ítem), `activities` y `activity_items` (cronograma), `purchase_orders`, `purchase_order_lines` y `payments`, `quote_requests` y `quote_lines`, `item_execution` (estado de montaje), `pre_event_checks` e `item_evidences` (fotografías; el archivo vive en el almacenamiento privado). Todas cuelgan de ítems de una matriz **confirmada** y del mismo proyecto.
+
+La migración `0008` (`PLAN.md`, «reparto de pagos») añade `payment_allocations` (reparto de cada pago entre los ítems de su misma orden). Desde entonces `purchase_order_lines.paid_amount` es un valor calculado, la suma de esos repartos: lo mantiene un trigger y ni la aplicación ni un script lo escriben directamente. Sigue siendo parte del modelo provisional que se rediseña en la Fase 6.
 
 Relaciones: una empresa puede tener varios proyectos; un contratante puede tener varios proyectos; un proyecto puede tener varios TDR; cada TDR puede tener varios intentos de extracción; cada extracción puede tener múltiples ítems; cada ítem tiene como máximo un responsable.
 

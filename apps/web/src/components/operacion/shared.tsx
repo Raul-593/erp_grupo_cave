@@ -23,7 +23,11 @@ export interface Kpi {
 /** Fila de indicadores del prototipo. Los valores se calculan siempre de las filas guardadas. */
 export function Kpis({ items }: { items: Kpi[] }) {
   return (
-    <dl className="mb-[18px] grid grid-cols-1 gap-[18px] min-[520px]:grid-cols-2 min-[1151px]:grid-cols-4">
+    <dl
+      className={`mb-[18px] grid grid-cols-1 gap-[18px] min-[520px]:grid-cols-2 ${
+        items.length === 5 ? 'min-[1151px]:grid-cols-5' : 'min-[1151px]:grid-cols-4'
+      }`}
+    >
       {items.map((item) => (
         <div key={item.label} className="rounded-lg border border-line bg-card px-4 py-3.5">
           <dt className="text-[9px] font-semibold tracking-[0.1em] text-mut2 uppercase">{item.label}</dt>

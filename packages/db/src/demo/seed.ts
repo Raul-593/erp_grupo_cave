@@ -148,7 +148,18 @@ function assertDataset(dataset: DemoDataset): void {
     need(suppliers, item.plan?.supplier ?? null, 'proveedor');
     need(workers, item.order?.paidBy ?? null, 'trabajador');
   }
-  for (const payment of dataset.payments) need(orders, payment.order, 'orden');
+  const orderOf = new Map(dataset.items.map((item) => [key(item.key), item.order ? key(item.order.code) : null]));
+  for (const payment of dataset.payments) {
+    need(orders, payment.order, 'orden');
+    for (const allocation of payment.allocations) {
+      need(items, allocation.item, 'ítem');
+      if (orderOf.get(key(allocation.item)) !== key(payment.order)) {
+        throw new DemoSeedError(
+          `Datos de demostración incoherentes: el pago «${payment.concept}» reparte al ítem «${allocation.item}», que no es de la orden ${payment.order}.`,
+        );
+      }
+    }
+  }
   for (const activity of dataset.activities) {
     need(workers, activity.responsible, 'trabajador');
     need(activities, activity.dependsOn, 'actividad');
@@ -316,6 +327,7 @@ export async function seedDemo(db: Queryable, options: DemoSeedOptions): Promise
 
   // 5. Planificación, órdenes y estado de montaje por ítem.
   const orderIds = new Map<string, string>();
+  const lineIds = new Map<string, string>();
   for (const row of dataset.items) {
     const itemId = lookup(itemIds, row.key, 'ítem');
     if (row.plan) {
@@ -337,11 +349,13 @@ export async function seedDemo(db: Queryable, options: DemoSeedOptions): Promise
         orderIds.set(key(row.order.code), orderId);
         add('purchase_orders');
       }
-      await db.query(
-        `INSERT INTO purchase_order_lines (purchase_order_id, tdr_item_id, amount, paid_amount, payment_worker_id)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [orderId, itemId, row.order.amount, row.order.paid, row.order.paidBy ? lookup(workerIds, row.order.paidBy, 'trabajador') : null],
+      const lineId = await insertId(
+        db,
+        `INSERT INTO purchase_order_lines (purchase_order_id, tdr_item_id, amount, payment_worker_id)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [orderId, itemId, row.order.amount, row.order.paidBy ? lookup(workerIds, row.order.paidBy, 'trabajador') : null],
       );
+      lineIds.set(key(row.key), lineId);
       add('purchase_order_lines');
     }
     if (row.mountStatus) {
@@ -350,12 +364,22 @@ export async function seedDemo(db: Queryable, options: DemoSeedOptions): Promise
     }
   }
 
+  // Pagos con su reparto: lo pagado de cada ítem lo calcula la base a partir de estas filas.
   for (const payment of dataset.payments) {
-    await db.query(
-      `INSERT INTO payments (purchase_order_id, paid_on, concept, method, amount, support) VALUES ($1, $2, $3, $4, $5, $6)`,
+    const paymentId = await insertId(
+      db,
+      `INSERT INTO payments (purchase_order_id, paid_on, concept, method, amount, support) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
       [lookup(orderIds, payment.order, 'orden'), payment.paidOn, payment.concept, payment.method, payment.amount, payment.support],
     );
     add('payments');
+    for (const allocation of payment.allocations) {
+      await db.query(`INSERT INTO payment_allocations (payment_id, purchase_order_line_id, amount) VALUES ($1, $2, $3)`, [
+        paymentId,
+        lookup(lineIds, allocation.item, 'ítem'),
+        allocation.amount,
+      ]);
+      add('payment_allocations');
+    }
   }
 
   // 6. Actividades: primero las filas, después las dependencias entre ellas.

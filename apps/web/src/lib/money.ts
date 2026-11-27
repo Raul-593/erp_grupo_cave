@@ -22,6 +22,11 @@ export function sumAmounts(amounts: readonly (string | null)[]): string {
   return fromCents(amounts.reduce((total, amount) => (amount === null ? total : total + toCents(amount)), 0n));
 }
 
+/** `a` menos `b`, con dos decimales. */
+export function subtractAmounts(a: string, b: string): string {
+  return fromCents(toCents(a) - toCents(b));
+}
+
 /** Negativo, cero o positivo según `a` sea menor, igual o mayor que `b`. */
 export function compareAmounts(a: string, b: string): number {
   const diff = toCents(a) - toCents(b);

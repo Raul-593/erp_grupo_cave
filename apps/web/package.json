@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "db:seed:demo": "node --env-file=../../.env scripts/seed-demo.ts"
+    "db:seed:demo": "node --env-file=../../.env scripts/seed-demo.ts",
+    "db:convert:paid": "node --env-file=../../.env scripts/convert-paid.ts"
   },
   "dependencies": {
     "@erp/db": "workspace:*",

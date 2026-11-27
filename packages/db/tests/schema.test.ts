@@ -117,7 +117,7 @@ describe('estructura', () => {
     expect(rows[0]?.schema).toBe(config.schema);
   });
 
-  it('tiene las tablas de las migraciones 0001-0007', async () => {
+  it('tiene las tablas de las migraciones 0001-0008', async () => {
     const { rows } = await client.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = $1 AND tablename <> 'pgmigrations' ORDER BY 1`,
       [config.schema],
@@ -130,6 +130,7 @@ describe('estructura', () => {
       'item_evidences',
       'item_execution',
       'item_plans',
+      'payment_allocations',
       'payments',
       'pre_event_checks',
       'projects',
@@ -155,11 +156,15 @@ describe('estructura', () => {
       'check_activity_dependency',
       'check_assignment_worker_active',
       'check_item_same_project',
+      'check_line_paid_amount',
+      'check_payment_allocated',
+      'check_payment_allocation',
       'check_project_ficha_extraction',
       'protect_tdr_extraction',
       'protect_tdr_items',
       'require_confirmed_item',
       'set_row_metadata',
+      'sync_line_paid_amount',
       'tdr_item_project_id',
     ]);
     for (const row of rows) expect(row.proconfig).toEqual([`search_path=${config.schema}`]);
@@ -626,7 +631,7 @@ describe('planificación, abastecimiento y ejecución (0007)', () => {
         order,
         item,
       ]);
-    expect(await line(a.items[0], '8400', '4200')).toBeUndefined();
+    expect(await line(a.items[0], '8400', '0')).toBeUndefined();
     expect(await line(a.items[0], '1', '0')).toBe(PgErrorCode.uniqueViolation);
     expect(await line(a.items[1], '-1', '0')).toBe(PgErrorCode.checkViolation);
     expect(await line(a.items[1], '1', '-1')).toBe(PgErrorCode.checkViolation);
@@ -689,5 +694,170 @@ describe('planificación, abastecimiento y ejecución (0007)', () => {
     expect(await evidence(items[1], 'evidencias/p/4.pdf', 'application/pdf', 100, 'd')).toBe(PgErrorCode.checkViolation);
     expect(await evidence(items[1], 'evidencias/../5.jpg', 'image/jpeg', 100, 'e')).toBe(PgErrorCode.checkViolation);
     expect(await evidence(items[1], 'evidencias/p/6.jpg', 'image/jpeg', 0, 'f')).toBe(PgErrorCode.checkViolation);
+  });
+});
+
+describe('reparto de pagos (0008)', () => {
+  let counter = 0;
+  /** Ejecuta una sentencia que debe fallar y devuelve el nombre de la regla (restricción) incumplida. */
+  async function brokenRule(sql: string, params: unknown[] = []): Promise<string | undefined> {
+    const savepoint = `regla_${++counter}`;
+    await client.query(`SAVEPOINT ${savepoint}`);
+    try {
+      await client.query(sql, params);
+    } catch (error) {
+      await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+      const constraint = (error as { constraint?: string }).constraint;
+      return constraint ?? `sin-restriccion:${getPgErrorCode(error) ?? '?'}`;
+    }
+    await client.query(`RELEASE SAVEPOINT ${savepoint}`);
+    return undefined;
+  }
+
+  /** Orden OC-001 con dos líneas (100 y 50) y un pago de 120; orden OC-002 con una línea y un pago de 30. */
+  async function seedOrders() {
+    const { projectId } = await seedProject();
+    const extractionId = await seedExtraction(await seedDocument(projectId), 'processed');
+    const items = [await seedItem(extractionId, 1), await seedItem(extractionId, 2), await seedItem(extractionId, 3)];
+    await client.query(`UPDATE tdr_extractions SET status = 'confirmed', confirmed_at = now() WHERE id = $1`, [extractionId]);
+    const order = (code: string) => insertId(`INSERT INTO purchase_orders (project_id, code) VALUES ($1, $2) RETURNING id`, [projectId, code]);
+    const line = (orderId: string, item: string | undefined, amount: string) =>
+      insertId(`INSERT INTO purchase_order_lines (purchase_order_id, tdr_item_id, amount) VALUES ($1, $2, $3) RETURNING id`, [
+        orderId,
+        item,
+        amount,
+      ]);
+    const payment = (orderId: string, amount: string) =>
+      insertId(
+        `INSERT INTO payments (purchase_order_id, paid_on, concept, method, amount, support)
+         VALUES ($1, '2026-12-01', 'Anticipo', 'transfer', $2, 'none') RETURNING id`,
+        [orderId, amount],
+      );
+    const first = await order('OC-001');
+    const second = await order('OC-002');
+    return {
+      first,
+      second,
+      lineA: await line(first, items[0], '100'),
+      lineB: await line(first, items[1], '50'),
+      lineC: await line(second, items[2], '30'),
+      payment: await payment(first, '120'),
+      otherPayment: await payment(second, '30'),
+    };
+  }
+
+  const ALLOCATE = `INSERT INTO payment_allocations (payment_id, purchase_order_line_id, amount) VALUES ($1, $2, $3)`;
+  const CHANGE = `UPDATE payment_allocations SET amount = $3 WHERE payment_id = $1 AND purchase_order_line_id = $2`;
+  const paid = async (lineId: string) =>
+    (await client.query<{ paid: string; version: number }>(`SELECT paid_amount AS paid, version FROM purchase_order_lines WHERE id = $1`, [lineId]))
+      .rows[0];
+
+  it('recalcula lo pagado de la línea al insertar, cambiar y borrar un reparto', async () => {
+    const s = await seedOrders();
+    expect(await paid(s.lineA)).toEqual({ paid: '0.00', version: 1 });
+    await client.query(ALLOCATE, [s.payment, s.lineA, '70.50']);
+    expect(await paid(s.lineA)).toEqual({ paid: '70.50', version: 2 });
+    expect((await paid(s.lineB))?.paid).toBe('0.00');
+
+    // Un segundo pago a la misma línea se suma.
+    const extra = await insertId(
+      `INSERT INTO payments (purchase_order_id, paid_on, concept, method, amount, support)
+       VALUES ($1, '2026-12-02', 'Saldo', 'cash', 40, 'none') RETURNING id`,
+      [s.first],
+    );
+    await client.query(ALLOCATE, [extra, s.lineA, '29.50']);
+    expect((await paid(s.lineA))?.paid).toBe('100.00');
+
+    await client.query(CHANGE, [s.payment, s.lineA, '10']);
+    expect((await paid(s.lineA))?.paid).toBe('39.50');
+    await client.query(`DELETE FROM payment_allocations WHERE payment_id = $1`, [extra]);
+    expect((await paid(s.lineA))?.paid).toBe('10.00');
+    await client.query(`DELETE FROM payment_allocations WHERE payment_id = $1`, [s.payment]);
+    expect((await paid(s.lineA))?.paid).toBe('0.00');
+  });
+
+  it('rechaza repartos a otra orden, por encima del pago o por encima del costo del ítem', async () => {
+    const s = await seedOrders();
+    expect(await brokenRule(ALLOCATE, [s.payment, s.lineC, '10'])).toBe('payment_allocations_same_order');
+    expect(await brokenRule(ALLOCATE, [s.payment, s.lineA, '100.01'])).toBe('payment_allocations_within_line');
+    expect(await brokenRule(ALLOCATE, [s.payment, s.lineA, '0'])).toBe('payment_allocations_amount_positive');
+    expect(await brokenRule(ALLOCATE, [s.payment, s.lineA, '100'])).toBeUndefined();
+    expect(await brokenRule(ALLOCATE, [s.payment, s.lineA, '1'])).toBe('payment_allocations_within_line');
+    // Al pago de 120 le quedan 20 por repartir.
+    expect(await brokenRule(ALLOCATE, [s.payment, s.lineB, '20.01'])).toBe('payment_allocations_within_payment');
+    expect(await brokenRule(ALLOCATE, [s.payment, s.lineB, '15'])).toBeUndefined();
+    expect(await brokenRule(ALLOCATE, [s.payment, s.lineB, '5'])).toBe('payment_allocations_payment_line_key');
+    expect(await brokenRule(CHANGE, [s.payment, s.lineB, '20.01'])).toBe('payment_allocations_within_payment');
+    expect(await brokenRule(CHANGE, [s.payment, s.lineB, '20'])).toBeUndefined();
+    // Con margen en el pago (quedan 10), el tope que salta es el costo del ítem.
+    expect(await brokenRule(CHANGE, [s.payment, s.lineB, '10'])).toBeUndefined();
+    expect(await brokenRule(CHANGE, [s.payment, s.lineA, '100.01'])).toBe('payment_allocations_within_line');
+    expect(
+      await brokenRule(`UPDATE payment_allocations SET purchase_order_line_id = $2 WHERE payment_id = $1 AND purchase_order_line_id = $3`, [
+        s.payment,
+        s.lineC,
+        s.lineB,
+      ]),
+    ).toBe('payment_allocations_keys_immutable');
+    expect(await brokenRule(`UPDATE payment_allocations SET payment_id = $2 WHERE payment_id = $1`, [s.payment, s.otherPayment])).toBe(
+      'payment_allocations_keys_immutable',
+    );
+    expect(await brokenRule(ALLOCATE, [randomUUID(), s.lineB, '1'])).toBe('payment_allocations_payment_id_fkey');
+    expect(await brokenRule(ALLOCATE, [s.payment, randomUUID(), '1'])).toBe('payment_allocations_purchase_order_line_id_fkey');
+    // Crear el pago y su reparto en una misma sentencia no se salta la validación.
+    expect(
+      await brokenRule(
+        `WITH p AS (INSERT INTO payments (purchase_order_id, paid_on, concept, method, amount, support)
+                    VALUES ($1, '2026-12-03', 'Otro', 'cash', 1, 'none') RETURNING id)
+         INSERT INTO payment_allocations (payment_id, purchase_order_line_id, amount) SELECT p.id, $2::uuid, 5 FROM p`,
+        [s.first, s.lineB],
+      ),
+    ).toBe('payment_allocations_within_payment');
+  });
+
+  it('no deja escribir lo pagado a mano ni bajar el costo por debajo de lo pagado', async () => {
+    const s = await seedOrders();
+    expect(await brokenRule(`UPDATE purchase_order_lines SET paid_amount = 10 WHERE id = $1`, [s.lineA])).toBe(
+      'purchase_order_lines_paid_amount_derived',
+    );
+    await client.query(`DELETE FROM purchase_order_lines WHERE id = $1`, [s.lineB]);
+    expect(
+      await brokenRule(
+        `INSERT INTO purchase_order_lines (purchase_order_id, tdr_item_id, amount, paid_amount)
+         SELECT $1, i.id, 50, 5 FROM tdr_items i WHERE i.item_number = 2 AND i.extraction_id = (
+           SELECT x.extraction_id FROM purchase_order_lines l JOIN tdr_items x ON x.id = l.tdr_item_id WHERE l.id = $2)`,
+        [s.first, s.lineA],
+      ),
+    ).toBe('purchase_order_lines_paid_amount_derived');
+    await client.query(ALLOCATE, [s.payment, s.lineA, '60']);
+    expect(await brokenRule(`UPDATE purchase_order_lines SET paid_amount = 0 WHERE id = $1`, [s.lineA])).toBe(
+      'purchase_order_lines_paid_amount_derived',
+    );
+    expect(await brokenRule(`UPDATE purchase_order_lines SET amount = 59.99 WHERE id = $1`, [s.lineA])).toBe(
+      'purchase_order_lines_paid_within_amount',
+    );
+    expect(await brokenRule(`UPDATE purchase_order_lines SET amount = 60 WHERE id = $1`, [s.lineA])).toBeUndefined();
+  });
+
+  it('bloquea mover o borrar pagos y líneas con reparto y bajar el pago por debajo de lo repartido', async () => {
+    const s = await seedOrders();
+    // Sin reparto, el pago puede cambiar de orden.
+    expect(await brokenRule(`UPDATE payments SET purchase_order_id = $2 WHERE id = $1`, [s.otherPayment, s.first])).toBeUndefined();
+    await client.query(ALLOCATE, [s.payment, s.lineA, '80']);
+
+    expect(await brokenRule(`UPDATE payments SET purchase_order_id = $2 WHERE id = $1`, [s.payment, s.second])).toBe('payments_order_locked');
+    expect(await brokenRule(`UPDATE payments SET amount = 79.99 WHERE id = $1`, [s.payment])).toBe('payments_amount_covers_allocations');
+    expect(await brokenRule(`UPDATE payments SET amount = 80 WHERE id = $1`, [s.payment])).toBeUndefined();
+    expect(await brokenRule(`UPDATE purchase_order_lines SET purchase_order_id = $2 WHERE id = $1`, [s.lineA, s.second])).toBe(
+      'purchase_order_lines_order_locked',
+    );
+    expect(await brokenRule(`UPDATE purchase_order_lines SET purchase_order_id = $2 WHERE id = $1`, [s.lineB, s.second])).toBeUndefined();
+    expect(await failureCode(`DELETE FROM payments WHERE id = $1`, [s.payment])).toBe(PgErrorCode.restrictViolation);
+    expect(await failureCode(`DELETE FROM purchase_order_lines WHERE id = $1`, [s.lineA])).toBe(PgErrorCode.restrictViolation);
+
+    // Quitado el reparto, todo vuelve a poder borrarse.
+    await client.query(`DELETE FROM payment_allocations WHERE payment_id = $1`, [s.payment]);
+    expect(await failureCode(`DELETE FROM purchase_order_lines WHERE id = $1`, [s.lineA])).toBeUndefined();
+    expect(await failureCode(`DELETE FROM payments WHERE id = $1`, [s.payment])).toBeUndefined();
   });
 });

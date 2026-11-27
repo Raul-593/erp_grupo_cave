@@ -7,6 +7,7 @@ import { Card, EmptyState, Note, PageHeader, Pill } from '@/components/ui';
 import { formatAmount, formatDayMonth } from '@/lib/format';
 import { ITEM_PAYMENT_STATUS, PAYMENT_METHOD, PAYMENT_SUPPORT } from '@/lib/labels';
 import { compareAmounts, percentOf, sumAmounts } from '@/lib/money';
+import { compactCodes } from '@/lib/numbering';
 import { getCurrentProject } from '@/server/current-project';
 import { db } from '@/server/db';
 import { loadMatrixView } from '@/server/matrix';
@@ -14,7 +15,8 @@ import { loadMatrixView } from '@/server/matrix';
 export const metadata: Metadata = { title: 'Abastecimiento' };
 
 const TITLE = 'Abastecimiento';
-const SUBTITLE = 'Lo que ya se compró y cómo se está pagando: las órdenes de cada entregable y los pagos registrados contra ellas.';
+const SUBTITLE =
+  'Lo que ya se compró y cómo se está pagando: las órdenes de cada entregable y los pagos registrados contra ellas, repartidos entre sus ítems.';
 
 export default async function AbastecimientoPage() {
   const project = await getCurrentProject();
@@ -31,8 +33,9 @@ export default async function AbastecimientoPage() {
   const money = (amount: string | null) => formatAmount(amount, project.currency);
   const symbol = project.currency === null || project.currency === 'USD' ? '$' : project.currency;
   const paidPercent = percentOf(totals.paidAmount, totals.orderedAmount);
-  const paymentsTotal = sumAmounts(payments.map((payment) => payment.amount));
-  const unreconciled = payments.length > 0 && compareAmounts(paymentsTotal, totals.paidAmount) !== 0;
+  const unallocated = compareAmounts(totals.unallocatedPayments, '0') > 0;
+  // Solo ocurre con datos anteriores al reparto de pagos que aún no se han convertido.
+  const manualPaid = compareAmounts(totals.paymentsAmount, sumAmounts([totals.paidAmount, totals.unallocatedPayments])) !== 0;
   // Lo comprometido por ítem: el monto de su orden o, si aún no tiene orden, su costo asignado.
   const committedTotal = sumAmounts([totals.orderedAmount, totals.unorderedCost]);
   const orderOptions = orders.map((order) => ({ id: order.id, name: order.code }));
@@ -67,6 +70,12 @@ export default async function AbastecimientoPage() {
             value: money(totals.outstandingAmount),
             hint: compareAmounts(totals.unorderedCost, '0') > 0 ? `incluye ${money(totals.unorderedCost)} sin orden` : undefined,
             tone: 'ba',
+          },
+          {
+            label: 'Pagos sin repartir',
+            value: money(totals.unallocatedPayments),
+            hint: unallocated ? 'pagado, aún sin asignar a ítems' : 'todo lo pagado está asignado',
+            tone: unallocated ? 'wa' : 'neutral',
           },
           { label: 'Compras internas', value: money(totals.holdingAmount), hint: 'a empresas del holding', tone: 'vi' },
         ]}
@@ -115,7 +124,7 @@ export default async function AbastecimientoPage() {
                       orders={orderOptions}
                       lineVersion={item.lineVersion}
                       amount={item.orderAmount}
-                      paidAmount={item.paidAmount}
+                      paidText={money(item.paidAmount)}
                       plannedCostText={money(item.plannedCost)}
                       balanceText={money(ordered ? item.balance : item.plannedCost)}
                       paymentWorkerId={item.paymentWorkerId}
@@ -177,6 +186,7 @@ export default async function AbastecimientoPage() {
                   <th scope="col" className="num">
                     Monto
                   </th>
+                  <th scope="col">Reparto</th>
                   <th scope="col">Respaldo</th>
                   <th scope="col">
                     <span className="sr-only">Acciones</span>
@@ -193,6 +203,18 @@ export default async function AbastecimientoPage() {
                       <td>{payment.concept}</td>
                       <td>{PAYMENT_METHOD[payment.method]}</td>
                       <td className="num">{money(payment.amount)}</td>
+                      <td>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {payment.itemIds.length > 0 ? (
+                            <span className="tabular-nums">
+                              {compactCodes(payment.itemIds.map((id) => view.codes.get(id) ?? '?'))}
+                            </span>
+                          ) : null}
+                          {compareAmounts(payment.unallocatedAmount, '0') > 0 ? (
+                            <Pill tone="wa">Sin repartir {money(payment.unallocatedAmount)}</Pill>
+                          ) : null}
+                        </div>
+                      </td>
                       <td>
                         <Pill tone={tone}>{label}</Pill>
                       </td>
@@ -219,8 +241,10 @@ export default async function AbastecimientoPage() {
                   <td className="border-t border-line2" colSpan={4}>
                     Total de pagos
                   </td>
-                  <td className="num border-t border-line2">{money(paymentsTotal)}</td>
-                  <td className="border-t border-line2" colSpan={2} />
+                  <td className="num border-t border-line2">{money(totals.paymentsAmount)}</td>
+                  <td className="border-t border-line2" colSpan={3}>
+                    {unallocated ? <span className="font-normal text-mut">sin repartir {money(totals.unallocatedPayments)}</span> : null}
+                  </td>
                 </tr>
               </tfoot>
             </table>
@@ -228,16 +252,17 @@ export default async function AbastecimientoPage() {
         )}
       </Card>
 
-      {unreconciled ? (
+      {manualPaid ? (
         <Note>
-          Los pagos registrados suman <b>{money(paymentsTotal)}</b> y lo pagado por ítem suma <b>{money(totals.paidAmount)}</b>. Por ahora
-          son dos registros independientes: lo pagado de cada ítem se escribe a mano en la tabla de órdenes. El cálculo automático a
-          partir de los pagos llegará con una migración posterior.
+          Hay ítems cuyo «pagado» se escribió a mano antes del reparto de pagos: los pagos suman <b>{money(totals.paymentsAmount)}</b> y lo
+          pagado por ítem suma <b>{money(totals.paidAmount)}</b>. Falta ejecutar la conversión que recalcula lo pagado a partir de los pagos.
         </Note>
       ) : null}
       <Note>
-        Orden, responsable de pago, costo y pagado se guardan al cambiarlos (los importes, al salir del campo o con Enter). Lo pagado no
-        puede superar el costo, y un ítem con algo pagado no se puede quitar de su orden.
+        Lo pagado de cada ítem ya no se escribe: es la suma de lo que le reparten los pagos. Para cambiarlo, registra un pago o edita el
+        reparto de uno existente. Orden, responsable de pago y costo se guardan al cambiarlos (el costo, al salir del campo o con Enter). A
+        un ítem no se le puede pagar más que su costo: primero sube el costo. Un ítem con pagos no se puede quitar ni cambiar de orden, y un
+        pago repartido no cambia de orden, hasta quitar el reparto.
       </Note>
     </>
   );

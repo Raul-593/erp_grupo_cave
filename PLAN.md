@@ -4,6 +4,159 @@
 
 | Tarea | Estado |
 | --- | --- |
+| Reparto de pagos: lo pagado por ítem se calcula a partir de los pagos (migración `0008`) | **Completado (2026-11-27), incluida la conversión de los datos existentes; pendiente la revisión final del usuario** |
+
+Las tareas anteriores (datos de demostración y fotografías, Operación › Requerimiento, subfase 1.1 y actualizaciones de `AGENTS.md`) se retiraron de este archivo a pedido del usuario (2026-11-27). Su detalle está en el historial de Git (commit `d039613`) y lo que sigue pendiente de ellas, en `MEMORY.md`.
+
+---
+
+## Tarea completada: reparto de pagos (lo pagado por ítem sale de los pagos)
+
+| Campo | Valor |
+| --- | --- |
+| Estado | **Aprobado por el usuario el 2026-11-27. Implementado y verificado (pasos 0–8, ver P9).** Conversión de los datos existentes ejecutada el 2026-11-27 con su visto bueno. **Completado** |
+| Origen | En F2c el usuario eligió escribir lo pagado a mano «por ahora» y hacer después la migración para calcularlo automáticamente (decisión F2-D1). Esta tarea es esa migración |
+| Fase | Adelanto acotado de la Fase 6 (pagos parciales asignados a obligaciones). No incluye facturas, comprobantes, aprobaciones ni impuestos |
+| Antes de empezar | Leer `AGENTS.md`, este plan y `MEMORY.md`; confirmar con el usuario las decisiones R-1 a R-5; no ejecutar nada sin su aprobación explícita |
+
+### P1. Objetivo
+
+Que «lo pagado» de cada ítem deje de escribirse a mano y sea siempre la suma de lo que los pagos registrados le asignan. Una sola fuente de verdad: desaparece la contradicción que hoy muestra Abastecimiento (pagos $18.540 frente a pagado por ítem $19.220 en la demostración).
+
+### P2. Situación actual (verificada el 2026-11-27)
+
+- `purchase_order_lines` (una línea por ítem): `amount` (costo en la orden), `paid_amount` (escrito a mano desde la pantalla) y `payment_worker_id`. Regla vigente: `paid_amount <= amount`; un ítem con `paid_amount > 0` no se puede quitar de su orden.
+- `payments` (por orden): fecha, concepto, forma, monto y respaldo. **No tienen relación con las líneas.**
+- Código que lee o escribe lo pagado: `packages/db/src/repositories/matrix.ts` (lee `paid_amount`, calcula saldo, estado y totales), `procurement-edits.ts` (`updateOrderLine`, `setItemOrder`, pagos), `packages/db/src/demo/seed.ts`, `apps/web/src/server/schemas.ts` y `actions/procurement.ts`, `components/operacion/procurement.tsx` (`OrderCells`, `PaymentForm`) y `app/operacion/abastecimiento/page.tsx`.
+- Datos en `erp` (proyecto «Prueba 1», demostración): 5 órdenes, 9 líneas con $19.220 pagado a mano y 4 pagos por $18.540. El usuario edita datos desde la aplicación: releer el estado real antes de migrar.
+
+### P3. Diseño propuesto
+
+**Migración `0008_reparto_pagos` (solo añade; no borra columnas ni datos):**
+
+- Tabla `payment_allocations`: `id`, `payment_id` → `payments` (`RESTRICT`), `purchase_order_line_id` → `purchase_order_lines` (`RESTRICT`), `amount numeric(14,2) CHECK > 0`, `UNIQUE (payment_id, purchase_order_line_id)`, índice por línea y metadatos de fila, como las demás tablas.
+- Trigger de validación en `payment_allocations` (defensa en la base, además del servidor): la línea debe ser de la **misma orden** que el pago; la suma repartida de un pago no supera su monto; la suma recibida por una línea no supera su `amount`. Bloquear las filas del pago y de la línea (`FOR UPDATE`) para evitar carreras.
+- Trigger que **recalcula `purchase_order_lines.paid_amount`** como la suma de sus repartos al insertar, cambiar o borrar un reparto. La columna se conserva como valor calculado: así `matrix.ts`, los totales y la regla `paid_amount <= amount` siguen funcionando sin reescribirse.
+- Protecciones en `payments`: no bajar el monto por debajo de lo ya repartido; no cambiar de orden un pago que tiene repartos.
+- Sección *down* con los `DROP` correspondientes; no se ejecuta sin autorización expresa.
+- Funciones con `SET search_path FROM CURRENT` y sin fijar esquema, como en `0001`–`0007`.
+
+**Repositorios (`packages/db`):**
+
+- `OrderLinePatch` deja de aceptar `paidAmount`; `updateOrderLine` solo cambia costo y responsable de pago. Bajar el costo por debajo de lo pagado sigue rechazado.
+- `createPayment` y `updatePayment` reciben el reparto (`[{ itemId o lineId, amount }]`) y lo guardan en la misma transacción; `deletePayment` borra antes sus repartos (las claves son `RESTRICT`, sin cascada).
+- Consultas nuevas: líneas de las órdenes del proyecto con su saldo (para el formulario) y, por pago, cuánto está repartido y cuánto queda sin repartir.
+- `getMatrixTotals`: añadir el total de pagos sin repartir.
+- `demo/seed.ts`: cargar los pagos con su reparto en lugar de un `paid` por ítem.
+
+**Pantallas (`apps/web`):**
+
+- **Formulario de pago:** al elegir la orden aparecen sus ítems con costo, pagado y saldo, y un campo «de este pago» por ítem. El sistema **propone** el reparto llenando el saldo de cada ítem en el orden de la matriz hasta agotar el monto; el usuario puede ajustarlo. Se muestra «repartido X de Y» y el servidor valida todo otra vez.
+- **Órdenes por entregable:** «Pagado» pasa a ser de solo lectura (calculado). Se quita el aviso de que pagos y pagado no se concilian.
+- **Pagos registrados:** columna con lo repartido y una etiqueta «Sin repartir $X» cuando falte; indicador nuevo «Pagos sin repartir».
+- Mensajes en español para cada regla (`BusinessRuleError`).
+
+**Conversión de los datos existentes (script aparte, idempotente, no dentro de la migración):** ver R-1.
+
+### P4. Decisiones del usuario
+
+Respuestas del usuario del 2026-11-27. Las cinco decisiones quedan resueltas.
+
+| ID | Decisión | Recomendación | Alternativa | Respuesta del usuario |
+| --- | --- | --- | --- | --- |
+| R-1 | Qué hacer con lo pagado a mano que ya existe | **Recalcular desde los pagos:** poner lo pagado en cero y repartir cada pago existente entre los ítems de su orden con la regla de propuesta (en el orden de la matriz, hasta el saldo de cada uno). En la demostración el total pagado pasaría de $19.220 a $18.540 y cambiaría el estado de algunos ítems (por ejemplo, el anticipo de la OC-014 quedaría todo en el ítem 1.1). Con respaldo previo y mostrando al usuario el antes y el después para su visto bueno | Crear pagos «de ajuste» que reproduzcan lo escrito a mano: conserva los $19.220 pero inventa pagos que no existieron | **Recalcularlo desde los pagos** (2026-11-27). No se crean pagos de ajuste |
+| R-2 | Pago repartido solo en parte | **Permitirlo** y señalarlo («Sin repartir $X»): un anticipo puede registrarse antes de saber a qué ítems corresponde | Exigir que el reparto sume exactamente el monto del pago | **Permitirlo y señalarlo** (2026-11-27) |
+| R-3 | Pagar más que el costo de un ítem | **Rechazarlo** (regla actual). Para pagar más, primero se sube el costo del ítem en la orden | Permitirlo con advertencia | **Rechazarlo, con un aviso que diga que primero se debe subir el costo** (2026-11-27) |
+| R-4 | Cambiar de orden un pago ya repartido, o quitar de la orden un ítem con pagos | **Bloquearlo** con un mensaje que indique quitar antes el reparto | Mover o borrar los repartos automáticamente | **Bloquearlo** (2026-11-27) |
+| R-5 | Regla de la propuesta automática | En el orden de la matriz, hasta el saldo de cada ítem | Proporcional al costo de cada ítem | **En el orden de la matriz, hasta el saldo de cada ítem** (2026-11-27) |
+
+Las cinco respuestas coinciden con la recomendación, así que el diseño de P3, los pasos de P5 y los criterios de P6 no cambian. Precisión de R-3: el rechazo se muestra como un aviso visible que indica subir primero el costo del ítem en la orden.
+
+### P5. Pasos
+
+| # | Paso | Verificación |
+| --- | --- | --- |
+| 0 | Presentar este plan y obtener la aprobación del usuario y sus respuestas a R-1 a R-5. **Hecho (2026-11-27)** | Aprobación explícita |
+| 1 | Releer el estado real de órdenes, líneas y pagos en `erp`; respaldo con `pg_dump` en `dumps/` | Archivo creado; cifras de partida anotadas |
+| 2 | Escribir `0008`; validarla en un esquema temporal dentro de una transacción revertida (up 0001–0008, comprobaciones, down) | Sin objetos restantes |
+| 3 | Aplicar en `erp_test`; pruebas de esquema de las reglas (misma orden, tope del pago, tope de la línea, recálculo al insertar/cambiar/borrar, protecciones de `payments`) | `pnpm test:db` |
+| 4 | Repositorios y sus pruebas; actualizar `demo/seed.ts` y `tests/demo-seed.test.ts` | `pnpm test:db`, `pnpm typecheck` |
+| 5 | Aplicar `0008` en `erp`. Script de conversión (R-1): primero en simulación mostrando antes y después por ítem; ejecutarlo solo con el visto bueno del usuario | `pnpm db:status`; totales calculados |
+| 6 | Esquemas, acciones y pantallas (formulario con reparto, «Pagado» de solo lectura, pagos sin repartir) | Pruebas de validación |
+| 7 | `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`; prueba real en el navegador: registrar un pago con reparto propuesto y ajustado, sobrepago rechazado, corregir y eliminar un pago (lo pagado baja), restaurar lo que se cambie para probar | Todo en verde; datos del usuario como estaban |
+| 8 | Actualizar `AGENTS.md` (§2 y §7: lo pagado ya no se escribe a mano; tabla nueva), `PLAN.md` y `MEMORY.md` | Sin secretos |
+
+Sin dependencias nuevas. Sin commits ni push salvo que el usuario lo pida.
+
+### P6. Criterios de aceptación
+
+1. Lo pagado de cada ítem es igual a la suma de los repartos de los pagos; no existe forma de escribirlo a mano.
+2. Registrar, corregir o eliminar un pago actualiza lo pagado, el saldo y el estado de sus ítems en la misma operación.
+3. La base rechaza por sí sola: un reparto a un ítem de otra orden, repartir más que el monto del pago y pagar más que el costo del ítem.
+4. Abastecimiento muestra cuánto de cada pago está sin repartir y deja de mostrar el aviso de registros sin conciliar.
+5. Tras la conversión, total de pagos = total pagado + total sin repartir, y el usuario aprobó las cifras resultantes.
+6. `pnpm lint`, `pnpm typecheck`, `pnpm test` y `pnpm build` sin errores.
+
+### P7. Riesgos
+
+- **Cambian las cifras visibles** de la demostración (R-1); por eso el respaldo y la simulación previa.
+- **Triggers con sumas:** dos repartos simultáneos podrían pasar la validación a la vez si no se bloquean las filas del pago y de la línea; cubrirlo con una prueba.
+- **`paid_amount` como valor calculado:** nada más debe escribir esa columna; revisar todo el código que la toca (lista en P2).
+- **Datos editados por el usuario:** puede haber cambiado órdenes y pagos desde la aplicación; no asumir las cifras de este plan.
+- **Sigue siendo provisional frente a la Fase 6:** faltan facturas, comprobantes, aprobaciones, impuestos y varios proveedores por ítem.
+- **Compatibilidad con Supabase:** no usar funciones exclusivas de PostgreSQL 18.
+
+### P8. Notas para la sesión que lo ejecute
+
+- El usuario suele tener su servidor de desarrollo en `http://127.0.0.1:3000`; no reiniciarlo. Si no recarga un archivo, compilar y usar la entrada `web-verificacion` (puerto 3100) de `.claude/launch.json`.
+- En las pruebas de pantalla, los campos de texto solo guardan con escritura real (no asignando el valor por JavaScript).
+- Patrones a seguir: edición en línea en `components/operacion/inline.tsx` y `procurement.tsx`; acciones que devuelven `InlineResult`; reglas con `BusinessRuleError`; importes exactos con `lib/money.ts` (nunca coma flotante).
+
+### P9. Resultado (2026-11-27)
+
+**Hecho (pasos 0 a 8):**
+
+- **Respaldo:** `dumps/erp_antes_0008_2026-11-27.dump` (esquema `erp`, tomado justo antes de migrar; ignorado por Git).
+- **Migración `0008_reparto_pagos`** aplicada en `erp_test` y en `erp`: tabla `payment_allocations`; trigger de validación (misma orden, tope del pago, tope del costo del ítem; bloquea pago y línea); trigger que recalcula `paid_amount`; trigger que impide escribir `paid_amount` a mano o cambiar de orden una línea con reparto; restricción `paid_amount <= amount`; protección de `payments` (no cambiar de orden ni bajar del monto repartido). Validada up y down en un esquema temporal dentro de una transacción revertida (0 objetos restantes).
+- **Repositorios:** `procurement-edits.ts` (pagos con reparto, `listOrderLines`, reglas con `BusinessRuleError` que indican el ítem, funciones de conversión), `operations.ts` (repartido, sin repartir e ítems de cada pago), `matrix.ts` (`paymentsAmount`, `unallocatedPayments`), `demo/seed.ts` y `demo/types.ts` (pagos con `allocations`; desaparece `order.paid`).
+- **Web:** `lib/allocation.ts` (regla de propuesta R-5), `components/operacion/payment-form.tsx` (formulario con reparto propuesto y ajustable), «Pagado» de solo lectura, columna «Reparto» y etiqueta «Sin repartir» en los pagos, indicador «Pagos sin repartir», mensajes en español de cada regla, `scripts/convert-paid.ts` (`pnpm db:convert:paid [--apply]`).
+- **R-3 (aviso):** el formulario avisa al instante («Supera el saldo del ítem… Primero sube su costo en la orden») y desactiva «Registrar pago»; el servidor lo rechaza igualmente con «No se guardó el pago: el ítem X recibiría más que su costo… Primero sube el costo del ítem…».
+- **Verificación:** `pnpm lint`, `pnpm typecheck`, `pnpm test` (87 de base de datos + 119 de web) y `pnpm build` sin errores. En el navegador, sobre la OC-015: reparto propuesto, reparto ajustado y parcial, sobrepago rechazado en pantalla y en el servidor, bloqueo al quitar el ítem de la orden y al bajar el costo, bloqueo al cambiar de orden un pago repartido, corrección del pago y eliminación (lo pagado volvió a cero). El pago de prueba se eliminó; los datos quedaron como estaban (solo subió el contador de versión de los ítems 2.1 y 2.3).
+- **Dos repartos simultáneos:** comprobado a mano con dos conexiones sobre `erp` en transacciones revertidas (la segunda espera a la primera). No quedó como prueba automática: exigiría datos confirmados y permanentes en `erp_test`.
+
+**Desviaciones respecto al plan:**
+
+- `0008` se corrigió una vez después de aplicarla en `erp_test` y antes de aplicarla en `erp` (rechazo explícito cuando el pago o la línea no existen). En `erp_test` la función `check_payment_allocation` se igualó con `CREATE OR REPLACE` (sin `DROP`) y se comprobó que las cuatro funciones son idénticas a las de una instalación limpia.
+- Además de lo previsto, la base impide escribir `paid_amount` directamente (ni la aplicación ni un script pueden hacerlo).
+- El archivo local de la demostración (`apps/web/scripts/local/demo-cave-v3.ts`, no versionado) se adaptó al nuevo formato: pagos con su reparto.
+- Se corrigió un fallo del formulario de pago que ya existía: tras un rechazo del servidor, las listas (orden, forma de pago, respaldo) volvían a su primera opción.
+
+**Pendiente — conversión de los datos existentes (R-1).** Simulación del 2026-11-27 sobre «Prueba 1» (6 órdenes, 5 pagos):
+
+| Ítem | Orden | Costo | Pagado antes | Pagado después | Estado |
+| --- | --- | --- | --- | --- | --- |
+| 1.1 Escenario modular | OC-014 | $8.400 | $4.200 | $8.400 | parcial → pagado |
+| 1.2 Techo de dos aguas | OC-014 | $6.200 | $3.100 | $0 | parcial → sin pagar |
+| 1.3 Vallas de cerramiento | OC-014 | $2.160 | $2.160 | $0 | pagado → sin pagar |
+| 2.1 Audio line array | OC-015 | $11.800 | $0 | $0 | sin pagar |
+| 2.2 Pantalla LED | OC-016 | $7.800 | $3.900 | $3.900 | parcial |
+| 2.3 Luces móviles | OC-015 | $4.440 | $0 | $0 | sin pagar |
+| 3.1 Sillas tiffany | OC-017 | $4.740 | $4.740 | $4.740 | pagado |
+| 3.2 Mesas redondas | OC-017 | $1.120 | $1.120 | $1.120 | pagado |
+| 4.1 Personal de protocolo | OC - 001 | $1.620 | $50 | $50 | parcial |
+| 5.1 Hospedaje de cuadrilla | OC-018 | $912 | $0 | $380 | sin pagar → parcial |
+
+Total pagado: de $19.270 a $18.590 = total de pagos; sin repartir: $0. No se crean ni modifican pagos. Mientras no se ejecute, Abastecimiento muestra los valores escritos a mano, todos los pagos como «sin repartir» y un aviso de que falta la conversión. Para ejecutarla: `pnpm db:convert:paid --apply` (una sola transacción; se revierte si lo guardado no coincide con lo simulado).
+
+**Conversión ejecutada (2026-11-27, 12:16, con el visto bueno del usuario).** Respaldo previo: `dumps/erp_antes_conversion_2026-11-27.dump`. Entre la simulación y la ejecución el usuario editó datos desde la aplicación (repartió a mano los pagos de OC-014, OC-016 y un pago nuevo de OC - 001, y cambió el costo del ítem 4.1), así que el resultado no es el de la tabla anterior: la conversión respetó esos tres repartos, repartió los tres pagos que seguían sin reparto (OC-017, OC-018 y «Aniticipo 2») y recalculó tres ítems (1.3 pasó de $2.160 a $0; 4.1 de $25 a $75; 5.1 de $0 a $380). Estado final: pagos $18.615 = pagado $15.515 + sin repartir $3.100 (lo que el usuario dejó sin repartir del anticipo de OC-014); ningún ítem con lo pagado sin respaldo; una segunda ejecución informa «Nada que convertir».
+
+**Riesgos que siguen abiertos:** los de P7 sobre la Fase 6 (modelo provisional) y la migración a Supabase (una carga solo de datos con triggers activos exige cargar los pagos y sus repartos después de las líneas con `paid_amount` en cero, o un volcado completo).
+# PLAN.md — erp_v1
+
+## Índice de tareas
+
+| Tarea | Estado |
+| --- | --- |
 | Datos de demostración del prototipo en el proyecto 1 + módulos Planificación, Abastecimiento y Ejecución (lectura) + carga de fotografías en Ejecución | **Completado (2026-11-27): etapas E, F, F2 (edición) y G (fotografías); pendiente la revisión final del usuario** |
 | Fase 1 · Módulo Operación › Requerimiento con el diseño del prototipo `CAVE-ERP-v3` (reemplaza el plan visual 1.0b; abarca 1.0b, 1.2, 1.3 y 1.4) | **Aprobado; en progreso** — etapas A y B completadas; C preparada sin proveedor (falta SDK y adaptador); D sin iniciar |
 | Actualización de `AGENTS.md`: terminología proyecto/empresa, guía visual, ficha del proyecto, rubros y responsable por ítem | Completado (2026-11-26, solicitado por el usuario) |

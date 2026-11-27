@@ -58,13 +58,29 @@ export interface Payment {
   amount: string;
   support: PaymentSupport;
   version: number;
+  /** Parte del pago repartida entre ítems de su orden. */
+  allocatedAmount: string;
+  /** Parte todavía sin repartir (cero si está repartido por completo). */
+  unallocatedAmount: string;
+  /** Ítems que reciben el pago, en el orden de la matriz. */
+  itemIds: string[];
 }
 
 export async function listPayments(db: Queryable, projectId: string): Promise<Payment[]> {
   const { rows } = await db.query<Payment>(
-    `SELECT p.id, o.id AS "orderId", o.code AS "orderCode", p.paid_on AS "paidOn", p.concept, p.method, p.amount, p.support, p.version
+    `SELECT p.id, o.id AS "orderId", o.code AS "orderCode", p.paid_on AS "paidOn", p.concept, p.method, p.amount, p.support, p.version,
+            COALESCE(a.total, 0)::numeric(14,2) AS "allocatedAmount",
+            (p.amount - COALESCE(a.total, 0))::numeric(14,2) AS "unallocatedAmount",
+            COALESCE(a.item_ids, '{}') AS "itemIds"
        FROM payments p
        JOIN purchase_orders o ON o.id = p.purchase_order_id
+       LEFT JOIN LATERAL (
+         SELECT sum(pa.amount) AS total, array_agg(l.tdr_item_id ORDER BY i.item_number, i.id) AS item_ids
+           FROM payment_allocations pa
+           JOIN purchase_order_lines l ON l.id = pa.purchase_order_line_id
+           JOIN tdr_items i ON i.id = l.tdr_item_id
+          WHERE pa.payment_id = p.id
+       ) a ON true
       WHERE o.project_id = $1
       ORDER BY p.paid_on, o.code, p.id`,
     [projectId],

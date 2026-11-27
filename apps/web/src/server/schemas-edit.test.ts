@@ -7,6 +7,7 @@ import {
   mountChangeSchema,
   orderFormSchema,
   orderLineChangeSchema,
+  parsePaymentAllocations,
   paymentFormSchema,
   planChangeSchema,
   responsibleChangeSchema,
@@ -111,9 +112,10 @@ describe('órdenes y pagos', () => {
   it('línea de orden: importes obligatorios, exactos y no negativos', () => {
     const change = (field: string, value: string) => orderLineChangeSchema.safeParse({ itemId: ITEM, version: '1', field, value });
     expect(change('amount', '8.400,50').data?.value).toBe('8400.50');
-    expect(change('paidAmount', '0').data?.value).toBe('0');
+    expect(change('amount', '0').data?.value).toBe('0');
     expect(change('paymentWorkerId', '').data?.value).toBeNull();
-    for (const [field, value] of [['amount', ''], ['paidAmount', '-1'], ['paidAmount', '1,234'], ['amount', 'abc'], ['order', OTHER]]) {
+    // Lo pagado ya no es un campo editable: se calcula a partir de los pagos.
+    for (const [field, value] of [['amount', ''], ['amount', '-1'], ['amount', '1,234'], ['amount', 'abc'], ['paidAmount', '10'], ['order', OTHER]]) {
       expect(change(field!, value!).success, `${field}=${value}`).toBe(false);
     }
     expect(orderLineChangeSchema.safeParse({ itemId: ITEM, version: '', field: 'amount', value: '1' }).success).toBe(false);
@@ -131,6 +133,40 @@ describe('órdenes y pagos', () => {
     expect(bad({ support: '' })).toBe(false);
     expect(bad({ orderId: '' })).toBe(false);
     expect(bad({ concept: '  ' })).toBe(false);
+  });
+
+  it('reparto del pago: ignora vacíos y ceros, admite repartir solo una parte y no más que el monto', () => {
+    const values = {
+      orderId: ITEM,
+      amount: '8.400',
+      [`reparto:${ITEM}`]: '4.200,50',
+      [`reparto:${OTHER}`]: ' ',
+      'reparto:33333333-3333-4333-8333-333333333333': '0',
+    };
+    expect(parsePaymentAllocations(values, '8400')).toEqual({
+      allocations: [{ itemId: ITEM, amount: '4200.50' }],
+      fieldErrors: {},
+      message: null,
+    });
+    // Justo el monto es válido; un centavo más, no.
+    const full = { [`reparto:${ITEM}`]: '8.000', [`reparto:${OTHER}`]: '400' };
+    expect(parsePaymentAllocations(full, '8400').message).toBeNull();
+    expect(parsePaymentAllocations({ ...full, [`reparto:${OTHER}`]: '400,01' }, '8400').message).toMatch(/suma más que el monto/);
+    // Sin monto válido no se compara la suma (el error está en el monto).
+    expect(parsePaymentAllocations(full, null).message).toBeNull();
+  });
+
+  it('reparto del pago: señala cada importe o ítem no válido', () => {
+    const result = parsePaymentAllocations(
+      { [`reparto:${ITEM}`]: 'abc', [`reparto:${OTHER}`]: '1,234', 'reparto:x': '5', 'reparto:44444444-4444-4444-8444-444444444444': '-3' },
+      '100',
+    );
+    expect(result.allocations).toEqual([]);
+    expect(Object.keys(result.fieldErrors).sort()).toEqual(
+      ['reparto:44444444-4444-4444-8444-444444444444', `reparto:${ITEM}`, `reparto:${OTHER}`, 'reparto:x'].sort(),
+    );
+    expect(result.fieldErrors['reparto:x']).toEqual(['Ítem no válido.']);
+    expect(result.message).toBeNull();
   });
 });
 

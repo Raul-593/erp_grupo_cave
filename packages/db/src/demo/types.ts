@@ -67,7 +67,8 @@ export interface DemoItem {
   /** Nombre de un trabajador de `workers`. */
   responsible: string | null;
   plan: { supplier: string | null; cost: number | null; contract: ContractStatus } | null;
-  order: { code: string; amount: number; paid: number; paidBy: string | null } | null;
+  /** Lo pagado del ítem no se indica aquí: sale del reparto de `payments`. */
+  order: { code: string; amount: number; paidBy: string | null } | null;
   mountStatus: MountStatus | null;
 }
 
@@ -78,6 +79,8 @@ export interface DemoPayment {
   method: PaymentMethod;
   amount: number;
   support: PaymentSupport;
+  /** Reparto entre ítems (`key`) de la misma orden; puede sumar menos que el monto. */
+  allocations: { item: string; amount: number }[];
 }
 
 export interface DemoActivity {
