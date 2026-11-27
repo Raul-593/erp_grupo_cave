@@ -4,129 +4,149 @@
 
 | Tarea | Estado |
 | --- | --- |
-| Subida de la base de datos, los archivos y el inicio de sesión a Supabase (parte S) | **Propuesto (2026-11-27).** Espera la aprobación del usuario y sus respuestas a S-D1…S-D8 |
-| Fase 1 · Operación › Requerimiento: adaptador de IA (etapa C) y matriz editable (etapa D) | **En pausa.** Etapas A, B y C (sin proveedor) hechas; falta elegir el proveedor de IA |
+| Proyecto «Graduaciones UNEMI» con tres eventos | **Completado en local (2026-11-27)**; pendiente la revisión del usuario (decisiones G-1…G-8). Resultado abajo |
+| Adaptador de IA (etapa C, subfase 1.3) | **Pendiente:** falta que el usuario elija proveedor y tenga clave de API |
+| Etapa D (subfase 1.4): matriz editable y confirmación | **Completado (2026-11-27)**; pendiente la revisión del usuario. Resultado abajo; retirar tras la revisión |
+| Subida a Supabase (parte S) | **Pospuesta por el usuario (2026-11-27)** hasta tener todo listo para las primeras pruebas. El proyecto de Supabase ya existe, vacío y sin conectar |
 
-Las tareas completadas (usuarios, roles y permisos —parte U—, reparto de pagos, datos de demostración y fotografías, etapas A–C de Requerimiento y subfase 1.1) se retiraron de este archivo a pedido del usuario (2026-11-27). Sus decisiones vigentes están en `AGENTS.md`, su estado en `MEMORY.md` y su detalle en el historial de Git de `PLAN.md`.
+### Camino a las primeras pruebas (orden acordado, 2026-11-27)
+
+Cada punto necesita su propio plan y aprobación.
+
+1. ~~Etapa D (subfase 1.4)~~ — completada el 2026-11-27. Con la matriz manual ya se pueden preparar proyectos reales sin IA.
+   - **Cambio de prioridad (2026-11-27):** «Graduaciones UNEMI» debe llegar a Supabase (local primero, producción después) para que los encargados suban fotografías desde el celular. Eso adelanta la parte S y la publicación (puntos 5 y 6) respecto de la IA, que queda pendiente. Falta la aprobación del plan S y sus decisiones S-D1…S-D8.
+2. **IA (siguiente):** elegir proveedor, clave en `.env`, SDK y adaptador; autorizar el envío de TDR reales.
+3. **Operación mínima en proyectos reales** (decisión pendiente): hoy actividades y controles previos solo se editan, no se crean; las cotizaciones son de solo lectura.
+4. **Validación (subfase 1.5):** TDR reales de distinto formato y extensión; criterios de calidad acordados con la empresa.
+5. **Parte S (Supabase):** base, archivos, ingreso con correo y contraseña, RLS, respaldos y usuarios reales.
+6. **Publicación (S-D8):** hosting, HTTPS, secretos y procesamiento de IA en segundo plano; revisión en celular.
+7. **Datos reales y piloto.**
+
+Las tareas completadas (usuarios y permisos, control de campo en Ejecución, reparto de pagos, demostración y fotografías, etapas A–C de Requerimiento, subfase 1.1) se retiraron de este archivo. Sus decisiones vigentes están en `AGENTS.md`, su estado en `MEMORY.md` y su detalle en el historial de Git.
 
 ---
 
-## Tarea propuesta: subida a Supabase (parte S)
+## Tarea urgente: proyecto «Graduaciones UNEMI» con tres eventos (2026-11-27)
 
 | Campo | Valor |
 | --- | --- |
-| Estado | **Propuesto (2026-11-27).** Nada se ejecuta sin la aprobación explícita del usuario |
-| Origen | Pedido del usuario (2026-11-27): terminada la parte U (usuarios y permisos), subir la base a Supabase y cargar allí los usuarios reales |
-| Fase | Preparación de producción (`AGENTS.md` §12), con aprobación independiente |
+| Estado | **Completado en local (2026-11-27).** Ejecución pedida directamente por el usuario («urgente»). Las decisiones G-1…G-8 las tomó el agente con el valor más conservador y **quedan pendientes de la revisión del usuario** |
+| Origen | `MATRIZ_COSTOS_GRADUACIONES BORRADOR DILAN copy.xlsx` (hojas QUITO, CUENCA y GUAYAQUIL). El archivo no se versiona |
+| Objetivo | Cargar el proyecto con sus tres eventos y que los encargados puedan subir fotografías por subproducto/requerimiento (también desde el celular), para generar el informe después |
+| Fuera de alcance | IA (queda pendiente), informe fotográfico, subida a Supabase (parte S: primero local; producción necesita su aprobación y credenciales), edición de P. Unit y anticipos desde pantalla |
+
+### Decisiones tomadas (revisar)
+
+| ID | Decisión |
+| --- | --- |
+| G-1 | **Evento** como entidad propia: tabla `project_events` y `tdr_items.event_id`. Requerimiento, Planificación, Abastecimiento y Ejecución muestran pestañas de evento (`?evento=`); los indicadores se calculan del evento visible |
+| G-2 | Niveles: `rubro` y `producto` = «Producto integral (TDR)»; `producto_codigo` = CPC; `tdr_ref` = «Ítem TDR»; `producto_descripcion` = «Descripción TDR»; `subproducto` = «Subproducto / requerimiento»; `descripcion` = «Especificación técnica»; `categoria` = «Cat.». La numeración en pantalla es `ítem TDR.posición` dentro de cada evento |
+| G-3 | Cada fila del Excel con subproducto es un ítem (y admite fotografías, que ya existían por ítem). Las filas sin subproducto (renglones vacíos de «Adicionales», totales y resúmenes) no se cargan |
+| G-4 | Costos: `item_plans.planned_cost` = subtotal del Excel; nuevas `unit_price`, `advance_1` y `advance_2`. **Saldo = subtotal − anticipos**, calculado, nunca guardado. Los anticipos del Excel no se cargan como pagos de órdenes (no tienen fecha ni respaldo, y algunos superan el subtotal) |
+| G-5 | **Estado operativo** propio (`item_execution.operational_status`: pendiente, en proceso, listo), distinto del estado de montaje. Lo cambia quien tiene `mount.update` |
+| G-6 | Proveedores: se crea en el catálogo cada nombre del Excel tal como está escrito, sin fusionar parecidos («monica» ≠ «MONICA ALBAN»). Los textos que no son un proveedor (PENDIENTE, NOMBRE, NO ES ENTREGABLE, NO CATERING) van a la observación |
+| G-7 | La columna «Responsable» de Cuenca (6 filas) va a la observación: esas personas no están en el catálogo de trabajadores y no se crean personas a partir de nombres parciales |
+| G-8 | La matriz entra como un intento con proveedor `excel`, ya confirmado, sobre un PDF generado que declara su origen (no es un TDR). Asignación de responsable **en bloque** por evento o por producto, para que los encargados alcancen sus ítems |
+
+### Pasos
+
+1. Migración `0011_eventos_costos` (respaldo previo `dumps/erp_antes_0011_2026-11-27.dump`) en `erp_test` y `erp`.
+2. Repositorios: eventos, columnas nuevas en la matriz, estado operativo, asignación en bloque; pruebas.
+3. Script `apps/web/scripts/import-graduaciones.ts` (idempotente, con `--dry-run`): lee un JSON extraído del Excel y crea proyecto, eventos, proveedores, matriz confirmada y costos.
+4. Pantallas: pestañas de evento, matriz con todas las columnas, Ejecución usable en celular, estado operativo y responsable en bloque.
+5. Verificación: pruebas, tipos, lint, build y recorrido en el navegador (también en tamaño de celular).
+
+### Resultado
+
+- **Base:** migración `0011_eventos_costos` en `erp_test` y `erp`. Repositorios `events.ts`, columnas nuevas en `matrix.ts` (indicadores por evento), `setItemOperationalStatus`, `assignResponsibleBulk` e `import/cost-matrix.ts`.
+- **Datos (solo en `erp` local):** proyecto «Graduaciones UNEMI» (contratante EP UNEMI, empresa Grupo CAVE, proceso LICS-EPUNEMI-2026-002) con 3 eventos y 593 ítems: Quito 187 (subtotal 110.911,08; anticipos 2.250,00), Cuenca 219 (56.645,50; 21.940,91) y Guayaquil 187 (97.407,00; 0). Los subtotales coinciden al centavo con los totales del Excel. Se omitieron 11 filas sin subproducto. 16 proveedores creados tal como están escritos (revisar duplicados: «MONICA»/«MONICA ALBAN», «DIEGO»/«DIEGO CHILIQUINGA»). Sin responsables asignados.
+- **Pantallas:** pestañas de evento en Requerimiento, Planificación, Abastecimiento y Ejecución; matriz por producto con subproducto, especificación, proveedor, días, cant., p. unit, subtotal, saldo, estado operativo, fotos y responsable; responsable en bloque; checklist de Ejecución para celular; botón «Tomar foto».
+- **Verificación:** lint, tipos, 112 pruebas de base y 154 de web, build. En el navegador: los tres eventos y sus totales; como superusuario, responsable en bloque sobre un producto; como empleado de campo en tamaño de celular, entrada directa a su evento, cambio de estado operativo y subida y borrado de una fotografía sintética (201 y foto visible); el proyecto de demostración (sin eventos) se ve igual que antes. Los datos de la prueba se revirtieron (queda su rastro en `audit_log`).
+- **No probado:** un celular real (el ingreso local solo acepta este equipo); varios usuarios a la vez; el rechazo del servidor a un empleado de campo sobre un ítem ajeno se apoya en `authorize` y en la prueba de cobertura, no se repitió en el navegador.
+
+### Riesgos
+
+- El ingreso local (`dev`) solo funciona desde este equipo: **el uso real desde celulares llega con Supabase Auth y la publicación** (parte S y S-D8).
+- 593 ítems: tablas largas por evento; sin medir con varios usuarios a la vez.
+- Los datos son un borrador del Excel: cantidades y precios pueden cambiar y la matriz confirmada no se edita (sí proveedor, costo, estados, responsable y fotos).
+
+---
+
+## Resultado: etapa D — matriz editable y confirmación (completada el 2026-11-27)
+
+Aprobada el 2026-11-27 con las recomendaciones de D-1…D-10. Pendiente la revisión del usuario; después se retira esta sección.
+
+- **Base:** migración `0010_una_matriz_por_proyecto` (aplicada en `erp_test` y `erp`; respaldo previo `dumps/erp_antes_0010_2026-11-27.dump`): al confirmar exige al menos un ítem y que el proyecto no tenga otra matriz confirmada. Repositorio `matrix-draft.ts`: importación idempotente de la propuesta, matriz manual (proveedor `manual`), alta, edición por campo con versión, mover dentro del rubro, eliminar (con su responsable) y confirmación; el orden se normaliza para que cada rubro quede junto. `updateProject` registra `ficha_extraction_id`.
+- **Servidor:** el orquestador copia la propuesta a la matriz en la misma transacción que guarda el JSON (D-2). Permiso `matrix.edit` (solo superusuario); acciones en `server/actions/matrix.ts` con `authorize` y `audit_log`. La ficha se aplica leyendo el JSON guardado, no lo que envía el navegador.
+- **Pantalla Requerimiento:** editor agrupado por rubro con guardado celda a celda, ↑ ↓, ✕, responsable, alta de ítems y «Confirmar matriz…» con resumen; violeta en lo que la IA propuso y nadie cambió; tarjeta «Ficha propuesta» con casillas por campo y elección del contratante (mantener, usar uno registrado o crear); «Empezar matriz a mano».
+- **Verificación:** lint, tipos, 103 pruebas de base y 148 de web, build. En el navegador, en el proyecto **«PRUEBA etapa D»** (con contratantes «PRUEBA contratante etapa D» y «PRUEBA contratante sintético S.A.», y un PDF inventado; quedan en la base local, D-10): matriz manual con alta, edición (incluido un valor no válido rechazado), mover, cambiar de rubro, responsable y eliminar; propuesta simulada (proveedor `prueba-sintetica`, sin IA real) en violeta, edición que quita el violeta, ficha aplicada por campos con contratante nuevo, confirmación y matriz visible en Planificación; rechazo del servidor a una segunda matriz y a editar un ítem confirmado; contabilidad en solo lectura.
+- **Desviaciones:** (1) «Procesar con IA» se bloquea cuando el proyecto ya tiene matriz confirmada (el resultado no podría confirmarse por D-7). (2) La descripción puede quedar vacía (el contrato `tdr-v1` y la base lo admiten); rubro y producto son obligatorios. (3) La ficha se aplica con casillas marcadas por defecto («aplicar todo» = dejar todas marcadas). (4) El panel de confirmación se corrigió tras la prueba (desbordaba a lo ancho); la corrección compila, pero no se volvió a abrir en el navegador porque ya no quedaba ningún borrador sin confirmar.
+- **Riesgos abiertos:** importación probada solo con una propuesta simulada (falta un adaptador real); matrices de cientos de filas sin medir; el borrador manual del proyecto de prueba quedó sin confirmar (inofensivo).
+
+---
+
+## Tarea pendiente: adaptador de IA (etapa C, subfase 1.3)
+
+| Campo | Valor |
+| --- | --- |
+| Estado | **Pendiente.** Hecho sin proveedor: contrato `tdr-v1`, prompt `tdr-extraccion-v1`, interfaz común, servicio, orquestador y pantalla de estado. Falta el adaptador |
+| Bloqueo | El usuario debe elegir proveedor (R-D6) y tener su clave de API |
+
+- **R-D6:** Anthropic (`@anthropic-ai/sdk`), OpenAI (`openai`) o Google (`@google/genai`). Antes de integrarlo se verifica en la documentación vigente la entrada PDF nativa, la salida estructurada y los límites. La clave la escribe el usuario en `.env`; enviar TDR reales requiere su autorización (si no, solo PDF sintéticos).
+- **R-D7:** el procesamiento corre dentro del servidor local; se reevalúa antes de publicar (punto 6 del camino).
+- **Pasos:** instalar el SDK aprobado; adaptador en `apps/web/src/integrations/ai/` registrado en `registry.ts`; pruebas con mock (respuesta válida, JSON inválido, incompleta, rechazada, vacía, timeout, doble clic); una prueba real solo con un PDF sintético o autorizado, con informe de tokens y duración.
+- **Riesgos:** coste y privacidad de las llamadas; PDF extensos que superen los límites del modelo (error controlado; dividir documentos requiere aprobación aparte, `AGENTS.md` §8); paneles de intento procesado o fallido aún sin verificar con datos reales.
+
+---
+
+## Tarea pospuesta: subida a Supabase (parte S)
+
+| Campo | Valor |
+| --- | --- |
+| Estado | **Propuesto y pospuesto (2026-11-27):** se hará cuando esté todo listo para las primeras pruebas (punto 5 del camino). Nada se ejecuta sin aprobación explícita |
 | Fuera de alcance | Publicar la aplicación web (S-D8), portal del proveedor, módulo de aprobación de costos, políticas RLS por usuario (S-D7) |
 
 ### S1. Objetivo
 
-La base de datos, los archivos (PDF y fotografías) y el inicio de sesión pasan a Supabase: primero en un proyecto de pruebas y, validado, en el de producción.
+La base de datos, los archivos (PDF y fotografías) y el inicio de sesión pasan a Supabase: primero en un proyecto de pruebas y, validado, en el de producción. Con la base en Supabase la aplicación sigue corriendo solo en este computador hasta publicarla (S-D8).
 
-**Aclaración:** con la base en Supabase la aplicación web sigue corriendo solo en este computador (`127.0.0.1`). Para que otras personas la usen desde sus equipos o celulares hay que publicarla (Netlify u otro hosting); eso es un plan aparte (S-D8).
+### S2. Punto de partida (2026-11-27)
 
-### S2. Punto de partida (verificado el 2026-11-27)
-
-- Migraciones `0001`–`0009` en `erp` y `erp_test` (PostgreSQL 18.4 local). Supabase usa una versión mayor anterior: no se usaron funciones exclusivas de la 18, pero hay que comprobarlo en S1.
-- Usuarios en `app_users` (rol, vínculo con trabajador o proveedor) con la columna `auth_subject`, vacía, prevista para el id de Supabase Auth. Historial en `audit_log`.
-- Autenticación detrás de la interfaz `AuthProvider` (`apps/web/src/integrations/auth/`). Hoy solo existe el adaptador `dev` («Entrar como…», sin contraseña), que se niega a funcionar con una base remota, desde otra dirección que no sea la del propio equipo o en un hosting. `AUTH_PROVIDER=supabase` se rechaza hasta que exista su adaptador.
-- Permisos por rol en el código (`apps/web/src/domain/access/permissions.ts`) y comprobados en el servidor en cada acción y ruta (una prueba lo exige).
-- Almacenamiento detrás de `FileStorage` (`integrations/storage/types.ts`), que ya admite `'local' | 'supabase'`; solo existe el adaptador local.
-- El esquema `erp` no está en `public`: la API automática de Supabase no lo expone por defecto.
-- El pool fija el esquema con `options: -c search_path=…` (`packages/db/src/client.ts`); el pooler de Supabase puede ignorarlo: el esquema se fijará en el rol de la base.
-- Los datos de `erp` son de ejemplo: la demostración del proyecto 1, trabajadores, proveedores y 18 usuarios de ejemplo creados a partir de ellos.
+- Migraciones `0001`–`0009` (PostgreSQL 18.4 local; Supabase usa una versión anterior: comprobar en S1).
+- `app_users.auth_subject` vacía, prevista para el id de Supabase Auth; historial en `audit_log`.
+- Autenticación detrás de `AuthProvider`; solo existe el adaptador `dev`, que se niega a funcionar con una base remota. `AUTH_PROVIDER=supabase` se rechaza hasta que exista su adaptador.
+- Almacenamiento detrás de `FileStorage` (`'local' | 'supabase'`); solo existe el adaptador local.
+- El esquema `erp` no está en `public`. El pool fija el esquema con `options: -c search_path=…`, que el pooler de Supabase puede ignorar: se fijará en el rol.
+- Conexión prevista: cadena del **Session pooler** en `.env` como `SUPABASE_DATABASE_URL`, sin reemplazar `DATABASE_URL`.
 
 ### S3. Decisiones que necesito (con recomendación)
 
 | ID | Decisión | Recomendación | Alternativa |
 | --- | --- | --- | --- |
-| S-D1 | Plan de Supabase | **Plan de pago (Pro)** para datos reales: el plan gratuito pausa el proyecto tras una semana sin uso y no incluye respaldos diarios. Usted confirma el costo vigente en el panel de Supabase; la cuenta y el pago los gestiona usted | Plan gratuito solo para el proyecto de pruebas |
-| S-D2 | Entornos | **Dos proyectos:** `erp-pruebas` (primero) y `erp-produccion` (después de validar). `AGENTS.md` §7 exige probar antes en un entorno no productivo | Un solo proyecto |
-| S-D3 | Región | **La misma región donde se vaya a publicar el servidor web**; si no está decidido, `us-east-1` (Estados Unidos, Este), en general la de menor latencia desde Ecuador. Conviene verificar con la empresa la Ley Orgánica de Protección de Datos Personales sobre transferencia internacional de datos | `sa-east-1` (São Paulo) |
-| S-D4 | Qué datos se suben | **Producción empieza limpia:** esquema completo, empresa, los catálogos que usted elija (trabajadores, proveedores, contratantes) y los usuarios reales. La demostración del proyecto 1 y los usuarios de ejemplo **no se suben** (`AGENTS.md` §2: la demostración es solo local) | Copiar todo, incluida la demostración, al proyecto de pruebas (exige cambiar la regla de §2) |
-| S-D5 | Archivos | **Buckets privados** `tdr` y `evidencias` en Supabase Storage; los archivos siempre pasan por el servidor, que comprueba permisos; nunca enlaces públicos | URLs firmadas de corta duración para descargar directo desde Supabase |
-| S-D6 | Cómo reciben su acceso las personas | **Invitación por correo** creada por el superusuario. Requiere configurar un servidor de correo propio (SMTP de la empresa o un servicio de envío): el correo integrado de Supabase es solo para pruebas y tiene un límite muy bajo | El superusuario crea el usuario con una contraseña temporal y la persona la cambia al entrar |
-| S-D7 | Seguridad dentro de la base (RLS) | **Ahora:** RLS activado en todas las tablas de `erp`, sin acceso para los roles públicos de Supabase (`anon`, `authenticated`), esquema no expuesto en la API automática y la aplicación con un rol propio `erp_app` que solo lee y escribe datos. Los permisos por usuario siguen en el servidor. **Después** (cuando exista el portal del proveedor, con usuarios externos): políticas RLS por usuario como segunda barrera | Políticas RLS por usuario desde ya: más seguridad en la base, pero cada consulta debe llevar la identidad del usuario y los repositorios cambian mucho |
-| S-D8 | Publicar la aplicación web | **Plan aparte** después de S: elegir dónde corre el servidor (Netlify tiene límites de duración que afectan al procesamiento de TDR con IA; `AGENTS.md` §3) | Incluirlo en esta tarea |
+| S-D1 | Plan de Supabase | **Pro** para datos reales (el gratuito pausa tras una semana sin uso y no tiene respaldos diarios); costo y cuenta los gestiona el usuario | Gratuito solo para pruebas |
+| S-D2 | Entornos | **Dos proyectos:** pruebas primero y producción después de validar | Uno solo |
+| S-D3 | Región | **La del futuro servidor web**; si no está decidida, `us-east-1`. Verificar con la empresa la Ley Orgánica de Protección de Datos Personales | `sa-east-1` |
+| S-D4 | Qué datos se suben | **Producción limpia:** esquema, empresa, catálogos elegidos y usuarios reales; sin demostración, usuarios de ejemplo ni proyectos de prueba | Copiar todo al proyecto de pruebas |
+| S-D5 | Archivos | **Buckets privados** `tdr` y `evidencias`; los archivos pasan por el servidor | URLs firmadas de corta duración |
+| S-D6 | Acceso de las personas | **Invitación por correo** (requiere SMTP propio) | Contraseña temporal |
+| S-D7 | RLS | **Ahora:** RLS en todas las tablas sin acceso para `anon` ni `authenticated` y rol `erp_app` solo de datos. **Después:** políticas por usuario | Políticas por usuario desde ya |
+| S-D8 | Publicar la web | **Plan aparte** | Incluirlo aquí |
 
 ### S4. Pasos
 
-**Lo que hace usted (yo no puedo crear cuentas ni contratar servicios):** crear la cuenta y los proyectos de Supabase (S-D1…S-D3) y copiar las cadenas de conexión y claves en `.env` (nunca en el chat ni en Git).
-
 | # | Paso | Verificación |
 | --- | --- | --- |
-| S0 | Aprobación de la parte S, de sus dependencias (`@supabase/supabase-js` y `@supabase/ssr`, SDK oficiales) y respuestas a S-D1…S-D8 | Aprobación explícita |
-| S1 | En `erp-pruebas`: comprobar versión de PostgreSQL, extensiones y conexión directa y por el pooler | Informe de compatibilidad |
-| S2 | Script de preparación por entorno: esquema `erp` y rol `erp_app` (solo datos, `search_path` fijado en el rol), sin permisos para `anon` ni `authenticated`. Aplicar `0001`–`0009` con node-pg-migrate | `pnpm db:status` contra Supabase |
-| S3 | Migración `0010_rls`: RLS activado en todas las tablas, con política solo para `erp_app` (funciona igual en local y en Supabase) | `anon` y `authenticated` no leen nada; Security Advisor de Supabase sin alertas críticas |
-| S4 | Adaptador `supabase` de almacenamiento (buckets privados, límites por bucket, clave de servicio solo en el servidor) | Pruebas con el mock y una real en `erp-pruebas` |
-| S5 | Adaptador `supabase` de autenticación: correo y contraseña, recuperación de contraseña, invitación o contraseña temporal (S-D6), renovación de sesión; vínculo con `app_users.auth_subject`; el correo pasa a ser obligatorio para entrar. El adaptador `dev` sigue bloqueado fuera del entorno local | Un usuario por rol en `erp-pruebas` |
-| S6 | Validación completa en `erp-pruebas` con la aplicación local apuntando a Supabase: las mismas pruebas por rol de la parte U | Todo en verde |
-| S7 | Producción: mismo procedimiento en `erp-produccion`; carga de los catálogos elegidos (S-D4) con un script que respeta el orden de las tablas y sus triggers (no un `pg_dump` completo: lleva la demostración y sintaxis de PostgreSQL 18); alta de los usuarios reales | Conteos por tabla; inicio de sesión de cada usuario |
-| S8 | Respaldos: confirmar los diarios de la base y definir aparte el de los archivos (los respaldos de la base no incluyen Storage; `AGENTS.md` §9). Reversión: mientras producción no se use, se vuelve al entorno local sin pérdida | Documento de respaldo y reversión |
-| S9 | Actualizar `.env.example` (sin valores), `AGENTS.md`, `PLAN.md` y `MEMORY.md` | Sin secretos |
+| S0 | Aprobación, dependencias (`@supabase/supabase-js`, `@supabase/ssr`) y respuestas S-D1…S-D8 | Aprobación explícita |
+| S1 | Comprobar versión, extensiones, SSL y conexión (solo lectura) | Informe de compatibilidad |
+| S2 | Esquema `erp`, rol `erp_app` y migraciones | `pnpm db:status` contra Supabase |
+| S3 | Migración de RLS (solo `erp_app`) | `anon`/`authenticated` no leen nada; Security Advisor sin alertas críticas |
+| S4 | Adaptador de almacenamiento `supabase` | Pruebas con mock y una real |
+| S5 | Adaptador de autenticación `supabase` (correo y contraseña, recuperación, invitación, `auth_subject`) | Un usuario por rol |
+| S6 | Validación completa con la aplicación local apuntando a Supabase | Pruebas por rol en verde |
+| S7 | Producción y carga de catálogos y usuarios reales (script que respeta triggers; no `pg_dump` completo) | Conteos e ingreso de cada usuario |
+| S8 | Respaldos de base y de archivos; plan de reversión | Documento |
+| S9 | Actualizar `.env.example`, `AGENTS.md`, `PLAN.md` y `MEMORY.md` | Sin secretos |
 
-### S5. Criterios de aceptación
+### S5. Riesgos
 
-1. En Supabase las tablas no son accesibles por la API pública, los archivos están en buckets privados, la aplicación usa un rol sin permisos de estructura y ningún secreto llega al navegador.
-2. Cada persona entra con su correo y contraseña; el ingreso de desarrollo no funciona contra Supabase.
-3. Cada rol puede exactamente lo mismo que en local (las pruebas por rol pasan contra `erp-pruebas`).
-4. Producción no contiene la demostración ni los usuarios de ejemplo; hay respaldo de base y de archivos y un plan de reversión.
-5. `pnpm lint`, `pnpm typecheck`, `pnpm test` y `pnpm build` sin errores.
-
-### S6. Riesgos
-
-- **Diferencia de versión** (local 18.4 frente a Supabase): se valida en S1 antes de tocar producción.
-- **Pooler de Supabase:** el modo de transacción no conserva ajustes de sesión; el esquema se fija en el rol.
-- **Correos de invitación:** sin un servidor de correo propio, Supabase no envía invitaciones reales (S-D6).
-- **Carga de datos con triggers:** `paid_amount` lo calcula un trigger a partir de los repartos de pagos; una carga de datos debe insertar pagos y repartos después de las líneas.
-- **Privacidad:** los TDR y fotografías de clientes quedan en un servicio externo; confirmar la autorización de la empresa y la región (S-D3).
-- **Costos:** Supabase Pro y, después, el hosting de la aplicación web tienen costo mensual; los decide usted.
-- **Historial de auditoría local:** `audit_log` de `erp` contiene las pruebas de la parte U; no se migra (S-D4).
-
----
-
-## Tarea en pausa: Fase 1 · Operación › Requerimiento
-
-| Campo | Valor |
-| --- | --- |
-| Estado | **En pausa.** Aprobada el 2026-11-26. Hechas las etapas A (base visual y datos, migración `0006`), B (carga de PDF, subfase 1.2) y C sin proveedor (contrato `tdr-v1`, prompt `tdr-extraccion-v1`, interfaz común de IA, servicio y orquestador). Pendientes: elegir proveedor de IA (R-D6) y la etapa D |
-| Fuera de alcance | Cotizaciones editables, versiones/adendas, exportar a Excel, precios, tareas y seguimiento de responsables, despliegue |
-
-### R1. Objetivo
-
-En **Operación › Requerimiento**: subir el PDF del TDR, pulsar «Procesar TDR con IA», obtener la ficha del proyecto y la matriz de entregables completa, revisarlas y corregirlas, asignar un responsable por ítem y confirmar el resultado en PostgreSQL.
-
-### R2. Decisiones vigentes
-
-- **R-D6 (pendiente del usuario):** primer adaptador de IA: Anthropic (`@anthropic-ai/sdk`), OpenAI (`openai`) o Google (`@google/genai`). Antes de integrarlo se verifica en la documentación vigente la entrada PDF nativa, la salida estructurada y los límites. Requiere la clave del usuario en `.env` y su autorización para enviar TDR reales; sin ella, solo PDF sintéticos.
-- **R-D7:** el procesamiento corre en el proceso del servidor local (intento `pending` con clave de idempotencia, consulta periódica del estado, intentos interrumpidos marcados como error). Se reevalúa antes de publicar la aplicación.
-- **R-D3:** la ficha vive en columnas de `projects`; la propuesta de la IA queda intacta en `raw_response.ficha` y `projects.ficha_extraction_id` registra de qué extracción se aplicó.
-- **R-D4:** el responsable vive en `tdr_item_assignments`; al reprocesar, el nuevo intento empieza sin responsables.
-- **Permisos (parte U):** cargar, procesar y borrar TDR exige `tdr.manage`; editar y confirmar la matriz y la ficha, `projects.write` y `items.assign` (hoy, solo el superusuario). Toda acción nueva debe llamar a `authorize` y registrar el cambio en `audit_log`.
-
-### R3. Pasos pendientes
-
-| # | Paso | Verificación |
-| --- | --- | --- |
-| 8 | Instalar el SDK aprobado (R-D6) y escribir su adaptador en `apps/web/src/integrations/ai/`, registrado en `registry.ts` | Pruebas con mock: respuesta válida, JSON inválido, incompleta, rechazada, vacía, timeout, doble clic |
-| 9 | Una prueba real **solo con un PDF sintético** (o real, si el usuario autoriza al proveedor) | Autorización previa; informe de tokens y duración |
-| 10 | **Etapa D (subfase 1.4):** importar `raw_response.items` a `tdr_items`; tabla agrupada por rubro con edición, alta, baja, renumeración y responsable; guardar; confirmar en una transacción; ficha con «Aplicar propuesta» | Pruebas de servicio y flujo completo en el navegador |
-| 11 | `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` | Todo en verde |
-| 12 | Actualizar `PLAN.md`, `MEMORY.md` y `AGENTS.md` | Sin secretos |
-
-### R4. Criterios de aceptación pendientes
-
-1. «Procesar TDR con IA» genera la ficha (contratante, código de proceso, objeto, monto, moneda, sedes, plazo, administrador del contrato) y la matriz con rubro, producto, subproducto, descripción, cant., unidad, días y observación; los errores de la IA se muestran en español y no crean resultados confirmados.
-2. La matriz se edita, agrupa por rubro y numera 1.1, 1.2…; cada ítem admite un responsable; se guarda y se confirma; el responsable puede cambiarse después de confirmar.
-3. El JSON original de la IA queda intacto y separado de las ediciones; reprocesar no modifica lo confirmado.
-4. Ninguna credencial, clave de IA ni consulta SQL llega al navegador.
-
-### R5. Riesgos
-
-- **Coste y privacidad de la IA:** las llamadas reales tienen coste y envían el TDR al proveedor; sin autorización, solo PDF sintéticos.
-- **PDF extensos:** pueden superar límites del modelo; se informan como error controlado. Dividir documentos requiere aprobación aparte (`AGENTS.md` §8).
-- **Procesamiento en el proceso del servidor:** un reinicio interrumpe el trabajo (se detecta y se marca como error); no apto para producción sin reevaluar.
-- **Numeración derivada:** 1.1, 1.2… cambia al reordenar o mover ítems entre rubros; es de presentación, no una referencia estable.
-- **Sin verificar con datos reales:** los paneles de intento procesado o fallido (no hay adaptador todavía).
+Diferencia de versión de PostgreSQL; pooler sin ajustes de sesión; invitaciones sin SMTP propio; carga de pagos con triggers (repartos después de las líneas); privacidad y región; costos mensuales.

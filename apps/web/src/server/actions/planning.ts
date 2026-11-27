@@ -1,12 +1,20 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getItemProjectId, saveItemPlan, setItemResponsible, withTransaction } from '@erp/db';
+import {
+  assignResponsibleBulk,
+  getConfirmedMatrix,
+  getItemProjectId,
+  listProjectEvents,
+  saveItemPlan,
+  setItemResponsible,
+  withTransaction,
+} from '@erp/db';
 import type { InlineResult } from '@/lib/action-state';
 import { audit, authorize } from '../auth';
 import { db } from '../db';
 import { toUserMessage } from '../errors';
-import { firstIssue, planChangeSchema, responsibleChangeSchema } from '../schemas';
+import { bulkResponsibleSchema, firstIssue, planChangeSchema, responsibleChangeSchema } from '../schemas';
 
 const ITEM_GONE = 'El ítem ya no existe. Recarga la página.';
 
@@ -52,4 +60,33 @@ export async function updateItemPlan(input: unknown): Promise<InlineResult> {
   }
   revalidatePath('/operacion', 'layout');
   return { ok: true };
+}
+
+/**
+ * Asigna un mismo responsable a los ítems de un evento del proyecto (o de uno de sus
+ * productos). Solo el superusuario. Devuelve cuántos ítems cambiaron.
+ */
+export async function assignResponsibleToEvent(input: unknown): Promise<InlineResult & { changed?: number }> {
+  const parsed = bulkResponsibleSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: firstIssue(parsed.error) };
+  const { projectId, eventId, rubro, workerId, onlyUnassigned } = parsed.data;
+  const auth = await authorize('items.assign', { projectId });
+  if (!auth.ok) return auth;
+  let changed = 0;
+  try {
+    const [matrix, events] = await Promise.all([getConfirmedMatrix(db(), projectId), listProjectEvents(db(), projectId)]);
+    if (!matrix) return { ok: false, message: 'El proyecto todavía no tiene una matriz confirmada.' };
+    if (!events.some((event) => event.id === eventId)) return { ok: false, message: 'El evento no pertenece a este proyecto. Recarga la página.' };
+    await withTransaction(db(), async (tx) => {
+      const itemIds = await assignResponsibleBulk(tx, matrix.extractionId, { eventId, rubro, onlyUnassigned }, workerId);
+      changed = itemIds.length;
+      if (changed > 0) {
+        await audit(tx, auth.user, 'item.assign_bulk', 'project_events', eventId, { workerId, rubro, onlyUnassigned, items: changed });
+      }
+    });
+  } catch (error) {
+    return { ok: false, message: toUserMessage(error) };
+  }
+  revalidatePath('/operacion', 'layout');
+  return { ok: true, changed };
 }

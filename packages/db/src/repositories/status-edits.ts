@@ -2,7 +2,7 @@
  * Edición de estados: actividades, montaje por ítem y checklist previo. Cada operación
  * comprueba la versión leída (VersionConflictError si el registro cambió o ya no existe).
  */
-import type { ActivityStatus, CheckResult, MountStatus } from '../domain.ts';
+import type { ActivityStatus, CheckResult, MountStatus, OperationalStatus } from '../domain.ts';
 import { getPgErrorCode, PgErrorCode } from '../errors.ts';
 import { buildSet, VersionConflictError, type Queryable } from './shared.ts';
 
@@ -55,6 +55,32 @@ export async function setItemMountStatus(
     expectedVersion,
     status,
   ]);
+  if (rowCount !== 1) throw new VersionConflictError('item_execution', itemId);
+}
+
+/**
+ * Estado operativo de un ítem (pendiente, en proceso, listo). `expectedVersion` es la versión
+ * leída del registro de ejecución, o null si el ítem todavía no lo tenía (se crea).
+ */
+export async function setItemOperationalStatus(
+  db: Queryable,
+  itemId: string,
+  expectedVersion: number | null,
+  status: OperationalStatus,
+): Promise<void> {
+  if (expectedVersion === null) {
+    try {
+      await db.query(`INSERT INTO item_execution (tdr_item_id, operational_status) VALUES ($1, $2)`, [itemId, status]);
+    } catch (error) {
+      if (getPgErrorCode(error) === PgErrorCode.uniqueViolation) throw new VersionConflictError('item_execution', itemId);
+      throw error;
+    }
+    return;
+  }
+  const { rowCount } = await db.query(
+    `UPDATE item_execution SET operational_status = $3 WHERE tdr_item_id = $1 AND version = $2`,
+    [itemId, expectedVersion, status],
+  );
   if (rowCount !== 1) throw new VersionConflictError('item_execution', itemId);
 }
 

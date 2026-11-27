@@ -47,8 +47,22 @@ export {
   type QuoteLine,
 } from './operations.ts';
 export { listSuppliers, getSupplier, createSupplier, updateSupplier, type Supplier, type SupplierInput } from './suppliers.ts';
-export { getItemProjectId, setItemResponsible, saveItemPlan, type ItemPlanInput } from './item-edits.ts';
-export { updateActivity, setItemMountStatus, setPreEventCheckResult, type ActivityPatch } from './status-edits.ts';
+export {
+  getItemProjectId,
+  setItemResponsible,
+  saveItemPlan,
+  assignResponsibleBulk,
+  type ItemPlanInput,
+  type BulkAssignTarget,
+} from './item-edits.ts';
+export { listProjectEvents, createProjectEvent, type ProjectEvent, type ProjectEventInput } from './events.ts';
+export {
+  updateActivity,
+  setItemMountStatus,
+  setItemOperationalStatus,
+  setPreEventCheckResult,
+  type ActivityPatch,
+} from './status-edits.ts';
 export {
   BusinessRuleError,
   listPurchaseOrders,
@@ -86,3 +100,23 @@ export {
 export { listUsers, getUser, createUser, updateUser, recordLogin, type AppUser, type AppUserInput } from './users.ts';
 export { isItemAssignedTo, isCheckAssignedTo, listWorkerProjectIds } from './access.ts';
 export { recordAudit, listAuditForEntity, type AuditEntry, type AuditRecord } from './audit.ts';
+export {
+  MANUAL_PROVIDER,
+  DraftRuleError,
+  getDraftExtraction,
+  getItemExtraction,
+  projectHasConfirmedMatrix,
+  listDraftItems,
+  importProposalItems,
+  createManualDraft,
+  addDraftItem,
+  updateDraftItem,
+  moveDraftItem,
+  deleteDraftItem,
+  confirmMatrix,
+  type DraftRuleCode,
+  type DraftExtraction,
+  type DraftItem,
+  type DraftItemInput,
+  type DraftItemField,
+} from './matrix-draft.ts';

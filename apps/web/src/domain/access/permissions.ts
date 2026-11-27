@@ -16,6 +16,11 @@ export const PERMISSIONS = [
   'tdr.manage',
   /** Ver la matriz de entregables (campo: solo sus ítems). */
   'matrix.read',
+  /**
+   * Editar el borrador de la matriz (añadir, cambiar, mover y eliminar filas), empezar una
+   * matriz a mano, aplicar la ficha propuesta y confirmar la matriz (etapa D).
+   */
+  'matrix.edit',
   /** Asignar o cambiar el responsable de un ítem. */
   'items.assign',
   /** Proveedor adjudicado y costo del ítem en Planificación (campo: solo sus ítems). */

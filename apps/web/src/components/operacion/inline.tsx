@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useTransition, type ReactNode } from 'react';
-import type { ActivityStatus, CheckResult, ContractStatus, MountStatus } from '@erp/db';
+import type { ActivityStatus, CheckResult, ContractStatus, MountStatus, OperationalStatus } from '@erp/db';
 import { useCan } from '@/components/access';
 import type { Permission } from '@/domain/access/permissions';
 import type { InlineResult } from '@/lib/action-state';
 import { formatAmount } from '@/lib/format';
-import { ACTIVITY_STATUS, CHECK_RESULT, CONTRACT_STATUS, MOUNT_STATUS } from '@/lib/labels';
+import { Pill } from '@/components/ui';
+import { ACTIVITY_STATUS, CHECK_RESULT, CONTRACT_STATUS, MOUNT_STATUS, OPERATIONAL_STATUS } from '@/lib/labels';
 import { assignResponsible, updateItemPlan } from '@/server/actions/planning';
-import { updateActivityField, updateCheckResult, updateMountStatus } from '@/server/actions/status';
+import { updateActivityField, updateCheckResult, updateMountStatus, updateOperationalStatus } from '@/server/actions/status';
 
 export interface Option {
   id: string;
@@ -407,6 +408,42 @@ export function MountSelect({
       permission="mount.update"
       className="!min-w-[124px]"
       onSave={(value) => updateMountStatus({ itemId, version: version === null ? '' : String(version), value })}
+    />
+  );
+}
+
+const OPERATIONAL_OPTIONS = (Object.entries(OPERATIONAL_STATUS) as [OperationalStatus, (typeof OPERATIONAL_STATUS)[OperationalStatus]][]).map(
+  ([value, [label]]) => [value, label] as const,
+);
+
+/**
+ * Estado operativo de un ítem (pendiente, en proceso, listo): lo cambian el superusuario y el
+ * empleado de campo responsable del ítem; los demás lo ven como etiqueta.
+ */
+export function OperationalSelect({
+  itemId,
+  itemLabel,
+  status,
+  version,
+}: {
+  itemId: string;
+  itemLabel: string;
+  status: OperationalStatus;
+  version: number | null;
+}) {
+  const canEdit = useCan('mount.update');
+  if (!canEdit) {
+    const [label, tone] = OPERATIONAL_STATUS[status];
+    return <Pill tone={tone}>{label}</Pill>;
+  }
+  return (
+    <SavingSelect
+      label={`Estado operativo del ítem ${itemLabel}`}
+      value={status}
+      options={OPERATIONAL_OPTIONS}
+      permission="mount.update"
+      className={`!min-w-[118px] ${status === 'ready' ? '!border-ok !text-ok' : status === 'in_progress' ? '!border-bl !text-bl' : ''}`}
+      onSave={(value) => updateOperationalStatus({ itemId, version: version === null ? '' : String(version), value })}
     />
   );
 }

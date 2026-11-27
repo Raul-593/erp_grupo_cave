@@ -8,6 +8,7 @@ import type {
   ContractStatus,
   ItemPaymentStatus,
   MountStatus,
+  OperationalStatus,
   PaymentMethod,
   PaymentSupport,
   QuoteStatus,
@@ -65,6 +66,12 @@ export const MOUNT_STATUS: Readonly<Record<MountStatus, string>> = {
   tested: 'Probado',
   in_event: 'En evento',
   dismounted: 'Desmontado',
+};
+
+export const OPERATIONAL_STATUS: Labels<OperationalStatus> = {
+  pending: ['Pendiente', 'wa'],
+  in_progress: ['En proceso', 'bl'],
+  ready: ['Listo', 'ok'],
 };
 
 export const SUPPLIER_KIND: Readonly<Record<SupplierKind, string>> = {

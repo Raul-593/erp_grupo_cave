@@ -12,6 +12,7 @@ export {
   PAYMENT_SUPPORTS,
   QUOTE_STATUSES,
   MOUNT_STATUSES,
+  OPERATIONAL_STATUSES,
   CHECK_RESULTS,
   EVIDENCE_MIME_TYPES,
   ITEM_PAYMENT_STATUSES,
@@ -27,6 +28,7 @@ export type {
   PaymentSupport,
   QuoteStatus,
   MountStatus,
+  OperationalStatus,
   CheckResult,
   EvidenceMimeType,
   ItemPaymentStatus,
@@ -36,3 +38,18 @@ export { seedDemo, buildDemoRawResponse, findDemoExtraction, DemoSeedError, DEMO
 export type { DemoSeedOptions, DemoSeedResult, DemoPreviousProject } from './demo/seed.ts';
 export type * from './demo/types.ts';
 export * from './repositories/index.ts';
+export {
+  importCostMatrix,
+  validateCostMatrix,
+  findProjectByName,
+  CostMatrixImportError,
+  EXCEL_PROVIDER,
+  EXCEL_PROMPT_VERSION,
+} from './import/cost-matrix.ts';
+export type {
+  CostMatrixDataset,
+  CostMatrixEvent,
+  CostMatrixItem,
+  CostMatrixImportOptions,
+  CostMatrixImportResult,
+} from './import/cost-matrix.ts';

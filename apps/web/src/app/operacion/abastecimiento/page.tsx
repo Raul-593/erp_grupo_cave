@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listPayments, listPurchaseOrders, listWorkers } from '@erp/db';
 import { DeletePaymentButton, NewOrderForm, OrderCells } from '@/components/operacion/procurement';
+import { EventTabs } from '@/components/operacion/events';
 import { DemoBanner, Kpis, ModuleEmpty, SupplierName } from '@/components/operacion/shared';
 import { Card, EmptyState, Note, PageHeader, Pill } from '@/components/ui';
 import { formatAmount, formatDayMonth } from '@/lib/format';
@@ -20,14 +21,14 @@ const TITLE = 'Abastecimiento';
 const SUBTITLE =
   'Lo que ya se compró y cómo se está pagando: las órdenes de cada entregable y los pagos registrados contra ellas, repartidos entre sus ítems.';
 
-export default async function AbastecimientoPage() {
+export default async function AbastecimientoPage({ searchParams }: { searchParams: Promise<{ evento?: string | string[] }> }) {
   // Superusuario: edita. Contabilidad: solo lectura (U-D6). Campo y proveedor no entran.
   const user = await requirePageUser('procurement.read');
   const canWrite = can(user.role, 'procurement.write');
   const canCreate = can(user.role, 'projects.write');
   const project = await getCurrentProject();
   if (!project) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="project" canCreate={canCreate} />;
-  const view = await loadMatrixView(project.id, user);
+  const view = await loadMatrixView(project.id, user, (await searchParams).evento);
   if (!view) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="matrix" canCreate={canCreate} />;
 
   const [payments, orders, workers] = await Promise.all([
@@ -62,6 +63,7 @@ export default async function AbastecimientoPage() {
         }
       />
       {view.demo ? <DemoBanner source={view.matrix.model} /> : null}
+      <EventTabs basePath="/operacion/abastecimiento" events={view.events} current={view.event} />
       <Kpis
         items={[
           { label: 'Órdenes emitidas', value: totals.orderCount, hint: money(totals.orderedAmount) },
@@ -119,7 +121,10 @@ export default async function AbastecimientoPage() {
                     <td>
                       <b className="font-semibold tabular-nums">{item.code}</b>
                     </td>
-                    <td>{item.producto}</td>
+                    <td>
+                      {item.eventId ? (item.subproducto ?? item.producto) : item.producto}
+                      {item.eventId && item.subproducto ? <small>{item.producto}</small> : null}
+                    </td>
                     <td>
                       <SupplierName name={item.supplierName} kind={item.supplierKind} />
                     </td>

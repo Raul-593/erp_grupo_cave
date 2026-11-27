@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "db:seed:demo": "node --env-file=../../.env scripts/seed-demo.ts",
-    "db:convert:paid": "node --env-file=../../.env scripts/convert-paid.ts"
+    "db:convert:paid": "node --env-file=../../.env scripts/convert-paid.ts",
+    "db:import:matrix": "node --env-file=../../.env scripts/import-cost-matrix.ts"
   },
   "dependencies": {
     "@erp/db": "workspace:*",

@@ -17,6 +17,7 @@ import {
   ITEM_SOURCES,
   loadDbConfig,
   MOUNT_STATUSES,
+  OPERATIONAL_STATUSES,
   PAYMENT_METHODS,
   PAYMENT_SUPPORTS,
   PgErrorCode,
@@ -118,7 +119,7 @@ describe('estructura', () => {
     expect(rows[0]?.schema).toBe(config.schema);
   });
 
-  it('tiene las tablas de las migraciones 0001-0009', async () => {
+  it('tiene las tablas de las migraciones 0001-0011', async () => {
     const { rows } = await client.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = $1 AND tablename <> 'pgmigrations' ORDER BY 1`,
       [config.schema],
@@ -136,6 +137,7 @@ describe('estructura', () => {
       'payment_allocations',
       'payments',
       'pre_event_checks',
+      'project_events',
       'projects',
       'purchase_order_lines',
       'purchase_orders',
@@ -159,6 +161,8 @@ describe('estructura', () => {
       'check_activity_dependency',
       'check_app_user_change',
       'check_assignment_worker_active',
+      'check_extraction_confirmation',
+      'check_item_event_project',
       'check_item_same_project',
       'check_line_paid_amount',
       'check_payment_allocated',
@@ -195,6 +199,7 @@ describe('estructura', () => {
       ['payments_support_valid', PAYMENT_SUPPORTS],
       ['quote_requests_status_valid', QUOTE_STATUSES],
       ['item_execution_mount_status_valid', MOUNT_STATUSES],
+      ['item_execution_operational_status_valid', OPERATIONAL_STATUSES],
       ['pre_event_checks_result_valid', CHECK_RESULTS],
       ['item_evidences_mime_type_image', EVIDENCE_MIME_TYPES],
       ['app_users_role_valid', USER_ROLES],
@@ -342,12 +347,21 @@ describe('extracciones', () => {
   it('reprocesa sin perder la confirmación y exige un reemplazo explícito', async () => {
     const { projectId } = await seedProject();
     const documentId = await seedDocument(projectId);
-    const first = await seedExtraction(documentId, 'processed');
+    // Desde 0010 solo se confirma una matriz con ítems.
+    const withItem = async (extractionId: string) => {
+      await client.query(
+        `INSERT INTO tdr_items (extraction_id, item_number, rubro, producto, descripcion, source) VALUES ($1, 1, 'R', 'P', 'D', 'manual')`,
+        [extractionId],
+      );
+      return extractionId;
+    };
+    const first = await withItem(await seedExtraction(documentId, 'processed'));
     await client.query(`UPDATE tdr_extractions SET status = 'confirmed', confirmed_at = now() WHERE id = $1`, [first]);
 
-    const second = await seedExtraction(documentId, 'processed');
+    const second = await withItem(await seedExtraction(documentId, 'processed'));
+    // La regla de una matriz confirmada por proyecto (0010) actúa antes que el índice único por documento.
     expect(await failureCode(`UPDATE tdr_extractions SET status = 'confirmed', confirmed_at = now() WHERE id = $1`, [second])).toBe(
-      PgErrorCode.uniqueViolation,
+      PgErrorCode.checkViolation,
     );
     expect(await failureCode(`UPDATE tdr_extractions SET status = 'processed' WHERE id = $1`, [first])).toBe(
       PgErrorCode.checkViolation,
@@ -936,5 +950,58 @@ describe('usuarios y auditoría (0009)', () => {
     expect(await brokenRule(`DELETE FROM audit_log`)).toBe('audit_log_append_only');
     expect(await brokenRule(`TRUNCATE audit_log`)).toBe('audit_log_append_only');
     expect(await brokenRule(`UPDATE app_users SET active = false WHERE id = $1`, [admin])).toBe('app_users_last_admin');
+  });
+});
+
+describe('una matriz confirmada por proyecto (0010)', () => {
+  let counter = 0;
+  async function brokenRule(sql: string, params: unknown[] = []): Promise<string | undefined> {
+    const savepoint = `matriz_${++counter}`;
+    await client.query(`SAVEPOINT ${savepoint}`);
+    try {
+      await client.query(sql, params);
+    } catch (error) {
+      await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+      return (error as { constraint?: string }).constraint ?? `sin-restriccion:${getPgErrorCode(error) ?? '?'}`;
+    }
+    await client.query(`RELEASE SAVEPOINT ${savepoint}`);
+    return undefined;
+  }
+
+  /** Documento con un intento `processed` (con o sin ítems) en el proyecto indicado. */
+  async function draft(projectId: string, withItem: boolean): Promise<string> {
+    const documentId = await insertId(
+      `INSERT INTO tdr_documents (project_id, storage_provider, storage_key, original_filename, mime_type, size_bytes, sha256)
+       VALUES ($1, 'local', $2, 'tdr.pdf', 'application/pdf', 10, $3) RETURNING id`,
+      [projectId, `tdr/${randomUUID()}.pdf`, randomUUID().replace(/-/g, '').padEnd(64, '0')],
+    );
+    const extractionId = await insertId(
+      `INSERT INTO tdr_extractions (tdr_document_id, idempotency_key, provider, model, prompt_version, schema_version, status, raw_response)
+       VALUES ($1, $2, 'prueba', 'modelo', 'v1', 'v1', 'processed', '{"items":[]}') RETURNING id`,
+      [documentId, randomUUID()],
+    );
+    if (withItem) {
+      await client.query(
+        `INSERT INTO tdr_items (extraction_id, item_number, rubro, producto, descripcion, source) VALUES ($1, 1, 'Rubro', 'Producto', 'Desc', 'manual')`,
+        [extractionId],
+      );
+    }
+    return extractionId;
+  }
+  const CONFIRM = `UPDATE tdr_extractions SET status = 'confirmed', confirmed_at = now() WHERE id = $1`;
+
+  it('no confirma una matriz vacía ni una segunda matriz en el mismo proyecto', async () => {
+    const clientId = await insertId(`INSERT INTO clients (name) VALUES ('Contratante sintético') RETURNING id`, []);
+    const project = await insertId(`INSERT INTO projects (client_id, name) VALUES ($1, 'Proyecto A') RETURNING id`, [clientId]);
+    const other = await insertId(`INSERT INTO projects (client_id, name) VALUES ($1, 'Proyecto B') RETURNING id`, [clientId]);
+
+    expect(await brokenRule(CONFIRM, [await draft(project, false)])).toBe('tdr_extractions_confirm_requires_items');
+    const first = await draft(project, true);
+    const second = await draft(project, true);
+    expect(await brokenRule(CONFIRM, [first])).toBeUndefined();
+    expect(await brokenRule(CONFIRM, [second])).toBe('tdr_extractions_one_confirmed_per_project');
+    // Otro proyecto confirma sin problema, y la confirmada puede seguir actualizándose.
+    expect(await brokenRule(CONFIRM, [await draft(other, true)])).toBeUndefined();
+    expect(await brokenRule(`UPDATE tdr_extractions SET error_message = NULL WHERE id = $1`, [first])).toBeUndefined();
   });
 });

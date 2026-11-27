@@ -28,6 +28,8 @@ export interface ExtractionSummary {
   createdAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
+  /** Versión de la fila (control de concurrencia al confirmar la matriz). */
+  version: number;
 }
 
 const SELECT = `
@@ -35,7 +37,7 @@ const SELECT = `
          schema_version AS "schemaVersion", raw_response AS "rawResponse", error_code AS "errorCode",
          error_message AS "errorMessage", input_tokens AS "inputTokens", output_tokens AS "outputTokens",
          total_tokens AS "totalTokens", duration_ms AS "durationMs", created_at AS "createdAt",
-         started_at AS "startedAt", finished_at AS "finishedAt"
+         started_at AS "startedAt", finished_at AS "finishedAt", version
     FROM tdr_extractions`;
 
 /**

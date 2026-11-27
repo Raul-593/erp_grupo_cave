@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { listActivities, listSuppliers, listWorkers, type Activity } from '@erp/db';
 import { ActivityCells, PlanCells, type Option } from '@/components/operacion/inline';
+import { EventTabs } from '@/components/operacion/events';
 import { DemoBanner, Kpis, ModuleEmpty, ProductCell, ScopeBanner, ViewChips } from '@/components/operacion/shared';
 import { Card, EmptyState, Note } from '@/components/ui';
 import { PageHeader } from '@/components/ui';
@@ -95,7 +96,7 @@ function MatrixTable({
                       <b className="font-semibold tabular-nums">{item.code}</b>
                     </td>
                     <td>
-                      <ProductCell producto={item.producto} secondary={item.rubro} />
+                      <ProductCell producto={item.eventId ? (item.subproducto ?? item.producto) : item.producto} secondary={item.rubro} />
                     </td>
                     <td className="num">{formatQuantity(item.cant)}</td>
                     <PlanCells
@@ -341,17 +342,22 @@ function ClientView({ view }: { view: MatrixView }) {
   );
 }
 
-export default async function PlanificacionPage({ searchParams }: { searchParams: Promise<{ vista?: string | string[] }> }) {
+export default async function PlanificacionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ vista?: string | string[]; evento?: string | string[] }>;
+}) {
   const user = await requirePageUser('matrix.read');
   const canCreate = can(user.role, 'projects.write');
   const project = await getCurrentProject();
   if (!project) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="project" canCreate={canCreate} />;
-  const view = await loadMatrixView(project.id, user);
+  const query = await searchParams;
+  const view = await loadMatrixView(project.id, user, query.evento);
   if (!view) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="matrix" canCreate={canCreate} />;
 
   // El empleado de campo no ve la vista del cliente (es de todo el proyecto).
   const views = view.scoped ? VIEWS.filter(([value]) => value !== 'cliente') : VIEWS;
-  const requested = (await searchParams).vista;
+  const requested = query.vista;
   const current: View = views.find(([value]) => value === requested)?.[0] ?? 'matriz';
   const visibleItems = new Set(view.items.map((item) => item.id));
   const activities = (current === 'cronograma' || current === 'actividades' ? await listActivities(db(), project.id) : []).filter(
@@ -374,7 +380,8 @@ export default async function PlanificacionPage({ searchParams }: { searchParams
       <PageHeader title={TITLE} subtitle={SUBTITLE} />
       {view.demo ? <DemoBanner source={view.matrix.model} /> : null}
       {view.scoped ? <ScopeBanner count={view.items.length} /> : null}
-      <ViewChips basePath="/operacion/planificacion" current={current} options={views} />
+      <EventTabs basePath="/operacion/planificacion" events={view.events} current={view.event} params={{ vista: current }} />
+      <ViewChips basePath="/operacion/planificacion" current={current} options={views} eventId={view.event?.id} />
       {current === 'matriz' ? (
         <MatrixTable
           view={view}

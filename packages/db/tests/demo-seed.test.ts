@@ -360,6 +360,8 @@ describe('carga de la demostración', () => {
       supplierCount: 2,
       holdingSupplierCount: 1,
       plannedCost: '640.25',
+      advancesAmount: '0.00',
+      costBalance: '640.25',
       orderCount: 2,
       orderedAmount: '600.25',
       paidAmount: '250.25',
@@ -371,6 +373,7 @@ describe('carga de la demostración', () => {
       unallocatedPayments: '10.00',
       fullyPaidCount: 1,
       mountedCount: 1,
+      readyCount: 0,
       itemsWithEvidence: 0,
       evidenceCount: 0,
     });

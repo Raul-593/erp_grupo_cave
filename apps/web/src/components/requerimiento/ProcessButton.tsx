@@ -12,11 +12,14 @@ export function ProcessButton({
   disabled,
   disabledReason,
   label = '◆ Procesar TDR con IA',
+  confirmMessage,
 }: {
   documentId: string | null;
   disabled: boolean;
   disabledReason?: string;
   label?: string;
+  /** Aviso antes de procesar, por ejemplo si hay un borrador editado que no pasará al nuevo intento (D-9). */
+  confirmMessage?: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -35,6 +38,7 @@ export function ProcessButton({
         title={disabled ? disabledReason : undefined}
         onClick={() => {
           if (!documentId) return;
+          if (confirmMessage && !window.confirm(confirmMessage)) return;
           const idempotencyKey = crypto.randomUUID();
           setMessage(null);
           startTransition(async () => {

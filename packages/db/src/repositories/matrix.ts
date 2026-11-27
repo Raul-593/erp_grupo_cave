@@ -1,4 +1,4 @@
-import type { ContractStatus, ItemPaymentStatus, MountStatus, SupplierKind } from '../domain.ts';
+import type { ContractStatus, ItemPaymentStatus, MountStatus, OperationalStatus, SupplierKind } from '../domain.ts';
 import type { Queryable } from './shared.ts';
 
 /** Extracción confirmada cuya matriz usan Planificación, Abastecimiento y Ejecución. */
@@ -44,6 +44,13 @@ export interface MatrixItem {
   unidad: string | null;
   dias: string | null;
   observacion: string | null;
+  /** Evento del proyecto al que pertenece el ítem (migración 0011); null si no distingue eventos. */
+  eventId: string | null;
+  /** Número del ítem en el TDR. */
+  tdrRef: string | null;
+  productoCodigo: string | null;
+  productoDescripcion: string | null;
+  categoria: string | null;
   // Responsable (Requerimiento)
   workerId: string | null;
   workerName: string | null;
@@ -52,6 +59,12 @@ export interface MatrixItem {
   supplierName: string | null;
   supplierKind: SupplierKind | null;
   plannedCost: string | null;
+  /** Precio unitario; el subtotal es `plannedCost`. */
+  unitPrice: string | null;
+  advance1: string | null;
+  advance2: string | null;
+  /** Saldo del ítem: subtotal menos anticipos (calculado por la base); null sin subtotal. */
+  costBalance: string | null;
   contractStatus: ContractStatus | null;
   /** Versión de la planificación del ítem; null si todavía no tiene. */
   planVersion: number | null;
@@ -70,6 +83,7 @@ export interface MatrixItem {
   lineVersion: number | null;
   // Ejecución
   mountStatus: MountStatus | null;
+  operationalStatus: OperationalStatus | null;
   /** Versión del registro de ejecución del ítem; null si todavía no tiene. */
   executionVersion: number | null;
   evidenceCount: number;
@@ -79,9 +93,12 @@ export async function listMatrixItems(db: Queryable, extractionId: string): Prom
   const { rows } = await db.query<MatrixItem>(
     `SELECT i.id, i.item_number AS "itemNumber", i.rubro, i.producto, i.subproducto, i.descripcion,
             i.cant, i.unidad, i.dias, i.observacion,
+            i.event_id AS "eventId", i.tdr_ref AS "tdrRef", i.producto_codigo AS "productoCodigo",
+            i.producto_descripcion AS "productoDescripcion", i.categoria,
             w.id AS "workerId", w.full_name AS "workerName",
             s.id AS "supplierId", s.name AS "supplierName", s.kind AS "supplierKind",
-            p.planned_cost AS "plannedCost", p.contract_status AS "contractStatus", p.version AS "planVersion",
+            p.planned_cost AS "plannedCost", p.unit_price AS "unitPrice", p.advance_1 AS "advance1", p.advance_2 AS "advance2",
+            (p.planned_cost - p.advance_1 - p.advance_2)::numeric(14,2) AS "costBalance", p.contract_status AS "contractStatus", p.version AS "planVersion",
             (SELECT count(*)::int FROM activity_items ai WHERE ai.tdr_item_id = i.id) AS "activityCount",
             o.id AS "orderId", o.code AS "orderCode", l.amount AS "orderAmount", l.paid_amount AS "paidAmount",
             l.amount - l.paid_amount AS balance,
@@ -90,7 +107,7 @@ export async function listMatrixItems(db: Queryable, extractionId: string): Prom
                  WHEN l.paid_amount < l.amount THEN 'partial'
                  ELSE 'paid' END AS "paymentStatus",
             pw.id AS "paymentWorkerId", pw.full_name AS "paymentWorkerName", l.version AS "lineVersion",
-            e.mount_status AS "mountStatus", e.version AS "executionVersion",
+            e.mount_status AS "mountStatus", e.operational_status AS "operationalStatus", e.version AS "executionVersion",
             (SELECT count(*)::int FROM item_evidences v WHERE v.tdr_item_id = i.id) AS "evidenceCount"
        FROM tdr_items i
        LEFT JOIN tdr_item_assignments a ON a.tdr_item_id = i.id
@@ -117,6 +134,10 @@ export interface MatrixTotals {
   supplierCount: number;
   holdingSupplierCount: number;
   plannedCost: string;
+  /** Anticipos registrados en la matriz de costos (migración 0011). */
+  advancesAmount: string;
+  /** Saldo: costo asignado menos anticipos. */
+  costBalance: string;
   orderCount: number;
   orderedAmount: string;
   paidAmount: string;
@@ -133,23 +154,27 @@ export interface MatrixTotals {
   unallocatedPayments: string;
   fullyPaidCount: number;
   mountedCount: number;
+  /** Ítems con estado operativo «listo». */
+  readyCount: number;
   itemsWithEvidence: number;
   evidenceCount: number;
 }
 
 /**
  * Con `workerId`, los indicadores cuentan solo los ítems de ese responsable (alcance de un
- * empleado de campo) y los pagos, que son de todo el proyecto, quedan en cero.
+ * empleado de campo) y los pagos, que son de todo el proyecto, quedan en cero. Con `eventId`,
+ * solo los ítems de ese evento (los pagos siguen siendo los de todo el proyecto).
  */
 export async function getMatrixTotals(
   db: Queryable,
   extractionId: string,
-  options: { workerId?: string | null } = {},
+  options: { workerId?: string | null; eventId?: string | null } = {},
 ): Promise<MatrixTotals> {
   const { rows } = await db.query<MatrixTotals>(
     `WITH item AS (
        SELECT i.id, lower(btrim(i.rubro)) AS rubro, a.worker_id, p.planned_cost, s.id AS supplier_id, s.kind,
-              l.purchase_order_id, l.amount, l.paid_amount, l.id AS line_id, e.mount_status,
+              COALESCE(p.advance_1, 0) + COALESCE(p.advance_2, 0) AS advances,
+              l.purchase_order_id, l.amount, l.paid_amount, l.id AS line_id, e.mount_status, e.operational_status,
               (SELECT count(*)::int FROM item_evidences v WHERE v.tdr_item_id = i.id) AS evidences
          FROM tdr_items i
          LEFT JOIN tdr_item_assignments a ON a.tdr_item_id = i.id
@@ -159,6 +184,7 @@ export async function getMatrixTotals(
          LEFT JOIN item_execution e ON e.tdr_item_id = i.id
         WHERE i.extraction_id = $1
           AND ($2::uuid IS NULL OR a.worker_id = $2::uuid)
+          AND ($3::uuid IS NULL OR i.event_id = $3::uuid)
      ), payment AS (
        SELECT p.amount,
               COALESCE((SELECT sum(a.amount) FROM payment_allocations a WHERE a.payment_id = p.id), 0) AS allocated
@@ -177,6 +203,8 @@ export async function getMatrixTotals(
             (count(DISTINCT supplier_id) FILTER (WHERE kind <> 'payroll'))::int AS "supplierCount",
             (count(DISTINCT supplier_id) FILTER (WHERE kind = 'holding'))::int AS "holdingSupplierCount",
             COALESCE(sum(planned_cost), 0)::numeric(14,2) AS "plannedCost",
+            COALESCE(sum(advances), 0)::numeric(14,2) AS "advancesAmount",
+            COALESCE(sum(COALESCE(planned_cost, 0) - advances), 0)::numeric(14,2) AS "costBalance",
             count(DISTINCT purchase_order_id)::int AS "orderCount",
             COALESCE(sum(amount), 0)::numeric(14,2) AS "orderedAmount",
             COALESCE(sum(paid_amount), 0)::numeric(14,2) AS "paidAmount",
@@ -189,10 +217,11 @@ export async function getMatrixTotals(
             (SELECT COALESCE(sum(amount - allocated), 0)::numeric(14,2) FROM payment) AS "unallocatedPayments",
             (count(*) FILTER (WHERE line_id IS NOT NULL AND paid_amount > 0 AND paid_amount >= amount))::int AS "fullyPaidCount",
             (count(*) FILTER (WHERE mount_status IN ('mounted', 'tested', 'in_event', 'dismounted')))::int AS "mountedCount",
+            (count(*) FILTER (WHERE operational_status = 'ready'))::int AS "readyCount",
             (count(*) FILTER (WHERE evidences > 0))::int AS "itemsWithEvidence",
             COALESCE(sum(evidences), 0)::int AS "evidenceCount"
        FROM item`,
-    [extractionId, options.workerId ?? null],
+    [extractionId, options.workerId ?? null, options.eventId ?? null],
   );
   const totals = rows[0];
   if (!totals) throw new Error('Totales de la matriz sin resultado');

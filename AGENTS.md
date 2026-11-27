@@ -17,12 +17,13 @@ Los TDR son documentos PDF proporcionados por diferentes clientes. Su estructura
 | Empresa | Razón social del holding que ejecuta el proyecto (por ejemplo, Grupo CAVE) | `companies` (preparada en esquema; sin interfaz en Fase 1) |
 | Proyecto | Unidad de trabajo con un contratante y un requerimiento; antes llamado «evento» | `projects` (antes `events`) |
 | Contratante | Cliente que emite el TDR | `clients` |
+| Evento | Ceremonia o sede de un proyecto (por ejemplo Quito, Cuenca y Guayaquil); los ítems de la matriz pueden pertenecer a uno | `project_events` y `tdr_items.event_id` |
 | Requerimiento | TDR cargado y su matriz de entregables | `tdr_documents`, `tdr_extractions`, `tdr_items` |
 | Rubro / producto / subproducto | Tres niveles de la matriz de entregables (ver §8) | columnas de `tdr_items` |
 | Responsable | Trabajador asignado a un ítem de la matriz | `workers` y `tdr_item_assignments` |
 | Usuario | Persona que entra al sistema, con un tipo de usuario: superusuario, empleado de campo, contabilidad o proveedor (§2, «Usuarios y permisos») | `app_users` |
 
-La empresa todavía no se gestiona en la interfaz: el esquema queda preparado para incorporarla sin reescribir el núcleo. «Evento» se sigue usando para la ceremonia o actividad física que se produce, no para la entidad principal.
+La empresa todavía no se gestiona en la interfaz: el esquema queda preparado para incorporarla sin reescribir el núcleo. «Evento» es la ceremonia o actividad física que se produce, no la entidad principal: un proyecto puede tener varios (ver §2, «Proyectos con varios eventos»).
 
 ## 2. Alcance de la primera entrega (Fase 1)
 
@@ -45,7 +46,7 @@ La extracción no debe generar precios ni presupuestos en esta fase. El monto de
 
 - Estimación de precios unitarios mediante IA, presupuestos y ofertas económicas.
 - Tareas, fechas y seguimiento de responsables (más allá de un responsable por ítem), permisos configurables desde pantalla e informes con revisión y aprobación. Los usuarios y sus cuatro tipos sí están adelantados (ver «Usuarios y permisos»).
-- Los demás módulos del prototipo: cierre, finanzas, administración (salvo Usuarios), portal del proveedor (salvo su página «en preparación»), comercial, marketing y talento; las versiones o adendas del requerimiento; la edición de la matriz confirmada (subfase 1.4) y la de cotizaciones. Planificación, abastecimiento y ejecución sí se consultan y se editan dentro de lo indicado en «Vista previa con datos de demostración».
+- Los demás módulos del prototipo: cierre, finanzas, administración (salvo Usuarios), portal del proveedor (salvo su página «en preparación»), comercial, marketing y talento; las versiones o adendas del requerimiento y la edición de una matriz ya confirmada (solo su responsable cambia); la edición de cotizaciones. Planificación, abastecimiento y ejecución sí se consultan y se editan dentro de lo indicado en «Vista previa con datos de demostración».
 - Operación sin conexión y sincronización de evidencias.
 - Gestión de proveedores, inventario, compras, facturación y contabilidad.
 - Generación de reportes fotográficos, y revisión o publicación de evidencias al cliente. La carga de fotografías por ítem desde Ejecución sí está adelantada (ver «Vista previa con datos de demostración»).
@@ -64,6 +65,18 @@ Mientras no haya clave de API, el usuario pidió seguir avanzando con los datos 
 - **Edición desde las pantallas (decisión del usuario, 2026-11-27):** responsable por ítem; proveedor, costo y contrato por ítem; catálogo mínimo de proveedores; estados de actividades, de montaje y del checklist previo; órdenes y pagos. Lo pagado por ítem no se escribe: es la suma de lo que los pagos reparten entre los ítems de su orden (decisión del usuario, 2026-11-27; `PLAN.md`, «reparto de pagos»). Un pago puede quedar repartido solo en parte, a un ítem no se le paga más que su costo (primero se sube el costo) y un pago o un ítem con reparto no cambia de orden. Cada cambio se valida en el servidor, usa control de versión y queda en el historial (`audit_log`) con el usuario que lo hizo.
 - Desde Ejecución se pueden **subir, ver y eliminar fotografías por ítem** (adelanto parcial de la Fase 7). Las fotografías del prototipo no existen como archivos y no se fabrican.
 - El modelo de órdenes, pagos y costos es provisional y se rediseña en la Fase 6.
+
+### Proyectos con varios eventos (decisión del usuario, 2026-11-27)
+
+Pedido urgente para el proyecto «Graduaciones UNEMI» (`PLAN.md`, decisiones G-1 a G-8, pendientes de la revisión del usuario):
+
+- Un proyecto puede tener **eventos** (`project_events`). Requerimiento, Planificación, Abastecimiento y Ejecución muestran pestañas de evento (`?evento=`): los ítems y los indicadores en pantalla son solo del evento elegido. El empleado de campo entra al primer evento donde tiene ítems.
+- La matriz de un proyecto con eventos se puede **cargar desde un JSON preparado a partir de un Excel** (`pnpm db:import:matrix`, idempotente, con `--dry-run`): entra como un intento con proveedor `excel`, ya confirmado, sobre un PDF generado que declara su origen. No es una propuesta de IA ni un TDR. El JSON y el conversor viven en `apps/web/scripts/local/` y no se versionan.
+- Cada fila con subproducto o requerimiento es un ítem y admite fotografías. La numeración en pantalla es «ítem del TDR.posición» dentro de cada evento.
+- Costos por ítem: precio unitario, subtotal (`planned_cost`) y dos anticipos; el **saldo** (subtotal − anticipos) se calcula, nunca se guarda. Estos anticipos no son pagos de órdenes.
+- **Estado operativo** por ítem (pendiente, en proceso, listo), independiente del estado de montaje; lo cambia quien tiene `mount.update`.
+- **Responsable en bloque** por evento o por producto (solo superusuario, permiso `items.assign`), para que los encargados alcancen sus ítems.
+- En Ejecución, el checklist de un proyecto con eventos está pensado para el celular; al subir fotografías hay un botón «Tomar foto» que abre la cámara.
 
 ### Usuarios y permisos (decisión del usuario, 2026-11-27)
 
@@ -192,7 +205,7 @@ La interfaz reproduce el estilo del prototipo `CAVE-ERP-v3`. Se toma su diseño,
 
 - **Estructura:** barra lateral oscura fija (logo «CAVE ERP», grupos de navegación en mayúsculas, ítem activo con borde azul a la izquierda); barra superior blanca con selector de proyecto, nombre y tipo del usuario y «Cerrar sesión»; subnavegación por pestañas en mayúsculas; contenido con ancho máximo de 1420 px. En pantallas de menos de 880 px la barra lateral se oculta tras un botón de menú.
 - **Navegación en Fase 1:** solo se muestra lo implementado y lo que el tipo de usuario puede abrir (`apps/web/src/lib/navigation.ts`): Operación › Proyectos (alta y selección mínima), Operación › Requerimiento, los catálogos mínimos de trabajadores y de proveedores, Planificación, Abastecimiento y Ejecución (§2), Administración › Usuarios (solo superusuario) y la página del portal del proveedor (solo proveedor). Los módulos restantes del prototipo (Cierre, Finanzas, el resto de Administración y del Portal proveedor, Comercial, Marketing, Talento, Mi día) no aparecen hasta su fase. El empleado de campo ve un aviso «Tus ítems» en las pantallas filtradas a su alcance. El selector «Empresa» se incorpora cuando se implemente `companies`.
-- **Pantalla Requerimiento:** encabezado con título en mayúsculas, subtítulo y acciones («+ Ítem», «Cargar TDR» como botón principal); tarjeta «Ficha del proyecto» en cuadrícula de etiqueta/valor; tarjeta «Matriz de entregables» con las columnas Ítem, Producto (con el rubro debajo en texto secundario), Subproducto, Descripción, Cant., Unidad, Días, Observaciones y **Responsable** (lista desplegable). Pie con el total de ítems y rubros. Las tarjetas de cotizaciones y comparativo se muestran en modo lectura (§2); las versiones/adendas quedan para fases posteriores.
+- **Pantalla Requerimiento:** encabezado con título en mayúsculas, subtítulo y acciones («+ Ítem», «Cargar TDR» como botón principal); tarjeta «Ficha del proyecto» en cuadrícula de etiqueta/valor; tarjeta «Ficha propuesta» (campos de la IA que difieren, con casillas para aplicarlos y la elección del contratante); tarjeta «Matriz de entregables» con las columnas Ítem, Producto (con el rubro debajo en texto secundario), Subproducto, Descripción, Cant., Unidad, Días, Observaciones y **Responsable** (lista desplegable). Mientras es borrador, la matriz se agrupa por rubro y cada celda se edita y se guarda al salir de ella, con ↑ ↓ para ordenar dentro del rubro, ✕ para eliminar, alta de ítems y «Confirmar matriz…» con resumen; sin TDR procesado se puede «Empezar matriz a mano». Pie con el total de ítems y rubros. Las tarjetas de cotizaciones y comparativo se muestran en modo lectura (§2); las versiones/adendas quedan para fases posteriores.
 - **Tokens:** se conservan los colores del prototipo como variables CSS (modo claro y oscuro): navegación `#0E1D33`, fondo `#F5F7FA`, tarjeta `#FFFFFF`, texto `#0F1A2A`, líneas `#E4E9F0`, azul primario `#1F5FCC`, éxito `#0E7A52`, advertencia `#9A6400`, error `#B4302A` y violeta `#5B4BB7` para todo lo que proviene de la IA. Los estados se muestran como etiquetas («pill») de color.
 - **Tipografía:** Inter 400/500/600 con cifras tabulares; títulos y rótulos en mayúsculas con espaciado amplio; tamaño base 13,5 px.
 - **Contenido de IA:** todo valor propuesto por la IA se distingue visualmente (violeta, rótulo «Propuesta IA») hasta que el usuario lo confirma.
@@ -215,7 +228,7 @@ La interfaz reproduce el estilo del prototipo `CAVE-ERP-v3`. Se toma su diseño,
 
 ### Modelo de datos
 
-Migraciones `0001`–`0009` aplicadas en `erp` y `erp_test`. `0001`–`0005` (subfase 1.1) crearon `clients`, `events`, `tdr_documents`, `tdr_extractions` y `tdr_items`; `0006` aplicó la terminología de §1 (renombró `events` a `projects` y añadió empresas, trabajadores y responsables). Las migraciones aplicadas no se editan: todo cambio va en una migración nueva.
+Migraciones `0001`–`0011` aplicadas en `erp` y `erp_test`. `0001`–`0005` (subfase 1.1) crearon `clients`, `events`, `tdr_documents`, `tdr_extractions` y `tdr_items`; `0006` aplicó la terminología de §1 (renombró `events` a `projects` y añadió empresas, trabajadores y responsables). Las migraciones aplicadas no se editan: todo cambio va en una migración nueva.
 
 | Entidad | Responsabilidad | Estado |
 | --- | --- | --- |
@@ -234,11 +247,22 @@ La migración `0008` (`PLAN.md`, «reparto de pagos») añade `payment_allocatio
 
 La migración `0009` (§2, «Usuarios y permisos») añade `app_users` (usuarios: nombre, correo opcional en minúsculas y único, tipo, vínculo con `workers` —obligatorio para el empleado de campo, uno por trabajador— o con `suppliers` —obligatorio y exclusivo del proveedor—, `auth_subject` para el futuro id de Supabase Auth, activo y último ingreso), `audit_log` (historial de solo agregar: un trigger impide modificarlo, borrarlo o vaciarlo) e `item_evidences.uploaded_by` (vacío en las fotografías anteriores). La base impide borrar usuarios y dejar sin superusuario activo.
 
-Relaciones: una empresa puede tener varios proyectos; un contratante puede tener varios proyectos; un proyecto puede tener varios TDR; cada TDR puede tener varios intentos de extracción; cada extracción puede tener múltiples ítems; cada ítem tiene como máximo un responsable.
+La migración `0010` (etapa D) impide confirmar una matriz vacía o una segunda matriz confirmada en el mismo proyecto, porque Planificación, Abastecimiento y Ejecución cuelgan de la matriz confirmada del proyecto.
+
+La migración `0011` (§2, «Proyectos con varios eventos») añade `project_events` (eventos de un proyecto, con nombre único por proyecto y el texto de sus fechas), las columnas opcionales `tdr_items.event_id` (un trigger exige que el evento sea del mismo proyecto), `tdr_ref`, `producto_codigo`, `producto_descripcion` y `categoria`, `item_plans.unit_price`, `advance_1` y `advance_2`, e `item_execution.operational_status`. En una matriz cargada desde Excel, `rubro` y `producto` llevan el mismo valor (el producto del TDR) y `subproducto` el requerimiento.
+
+Relaciones: una empresa puede tener varios proyectos; un proyecto puede tener varios eventos; un contratante puede tener varios proyectos; un proyecto puede tener varios TDR; cada TDR puede tener varios intentos de extracción; cada extracción puede tener múltiples ítems; cada ítem tiene como máximo un responsable.
 
 La asignación del responsable vive en una tabla separada de `tdr_items` porque los ítems de una extracción confirmada son inmutables, mientras que el responsable debe poder cambiarse después de confirmar. Un trabajador puede tener como máximo un usuario (`app_users.worker_id`); el empleado de campo trabaja sobre los ítems de su trabajador, de modo que reasignar un ítem cambia de inmediato quién puede verlo. Un trabajador con asignaciones o con usuario no se borra; se desactiva.
 
-Política vigente: como máximo una extracción confirmada por documento; reprocesar crea un nuevo intento y nunca modifica el confirmado.
+Política vigente (etapa D, decisiones del usuario del 2026-11-27):
+
+- El **borrador** de la matriz son las filas de `tdr_items` de un intento en `processed`. Al terminar el procesamiento, la propuesta de la IA se copia a esas filas (`source = ai`, con `source_index`) en la misma transacción que guarda el JSON; el JSON original no cambia. Una **matriz manual** es un intento con proveedor `manual`, sin propuesta, y filas `source = manual`.
+- El orden se guarda en `item_number` y se normaliza para que los ítems de un mismo rubro queden juntos; la numeración 1.1, 1.2… se calcula en pantalla sobre la matriz completa.
+- Lo que la IA propuso y nadie cambió se distingue en violeta hasta confirmar (se compara con el JSON original).
+- Confirmar exige al menos un ítem (rubro y producto obligatorios; descripción, cantidades y responsables opcionales). Como máximo **una matriz confirmada por documento y por proyecto**; con matriz confirmada no se reprocesa ni se empieza otra hasta que existan versiones y adendas.
+- La ficha propuesta se aplica campo por campo (`projects.ficha_extraction_id` registra de qué intento); el contratante propuesto solo se vincula a uno existente o se crea si el usuario lo elige.
+- Editar, aplicar la ficha y confirmar exige el permiso `matrix.edit` (solo superusuario).
 
 ## 8. Integración con proveedores de IA
 
@@ -419,7 +443,7 @@ Subfases ordenadas:
 2. **1.1 Base de datos:** configurar PostgreSQL local y pgAdmin, migraciones versionadas y entidades mínimas aprobadas. No crear una base de datos remota ni contratar servicios.
 3. **1.2 Carga de PDF:** registrar o seleccionar contratante y proyecto con los datos mínimos, validar y guardar el PDF en almacenamiento privado local.
 4. **1.3 Extracción IA:** botón «Procesar TDR con IA», prompt versionado, esquema de salida con ficha del proyecto y matriz de entregables (§8), interfaz común de IA con al menos un adaptador de proveedor y selección configurable de proveedor/modelo, gestión de estados, validación, errores y reintentos.
-5. **1.4 Tabla editable:** visualizar ítem (1.1, 1.2…), rubro, producto, subproducto, descripción, cant, unidad, días, observación y responsable; editar, agregar, eliminar y confirmar filas; asignar un responsable por ítem con una lista desplegable de trabajadores activos; editar y confirmar la ficha del proyecto. Conservar el JSON original y las ediciones humanas por separado. Guardar el resultado asociado al TDR y proyecto.
+5. **1.4 Tabla editable** (implementada el 2026-11-27, `PLAN.md` «Resultado: etapa D»)**:** visualizar ítem (1.1, 1.2…), rubro, producto, subproducto, descripción, cant, unidad, días, observación y responsable; editar, agregar, eliminar y confirmar filas; asignar un responsable por ítem con una lista desplegable de trabajadores activos; editar y confirmar la ficha del proyecto. Conservar el JSON original y las ediciones humanas por separado. Guardar el resultado asociado al TDR y proyecto.
 6. **1.5 Validación:** probar distintos formatos y PDF extensos, casos de tablas entre páginas, cantidades inciertas, reprocesamiento, seguridad y precisión. Acordar criterios cuantitativos con la empresa antes del piloto.
 
 **Entrega:** en Operación › Requerimiento, cargar un PDF, pulsar un botón, generar la ficha y el desglose, revisarlos, asignar un responsable por ítem y persistirlos en PostgreSQL. No implementar precios, tareas ni seguimiento de responsables, informes, pagos ni sincronización en esta fase, más allá de la vista previa de §2. Un prototipo sin autenticación solo puede ejecutarse localmente y con datos autorizados.

@@ -49,6 +49,10 @@ export const MOUNT_STATUSES = [
 ] as const;
 export type MountStatus = (typeof MOUNT_STATUSES)[number];
 
+/** Estado operativo de un ítem (migración 0011); independiente del estado de montaje. */
+export const OPERATIONAL_STATUSES = ['pending', 'in_progress', 'ready'] as const;
+export type OperationalStatus = (typeof OPERATIONAL_STATUSES)[number];
+
 export const CHECK_RESULTS = ['pending', 'pass', 'fail'] as const;
 export type CheckResult = (typeof CHECK_RESULTS)[number];
 

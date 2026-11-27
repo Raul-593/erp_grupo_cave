@@ -1,4 +1,4 @@
-import { BusinessRuleError, DbConfigError, getPgErrorCode, PgErrorCode, VersionConflictError } from '@erp/db';
+import { BusinessRuleError, DbConfigError, DraftRuleError, getPgErrorCode, PgErrorCode, VersionConflictError } from '@erp/db';
 import { RAISE_COST_FIRST } from '@/lib/constants';
 
 const UNIQUE_MESSAGES: Record<string, string> = {
@@ -24,10 +24,27 @@ const RULE_MESSAGES: Record<BusinessRuleError['rule'], string> = {
 /** Mensajes de las reglas que la base aplica con triggers (por nombre de tabla). */
 const CHECK_MESSAGES: Record<string, string> = {
   tdr_item_assignments: 'Ese trabajador está desactivado y no puede ser responsable.',
+  tdr_items: 'Esta matriz ya está confirmada y no se puede modificar (solo su responsable).',
 };
 
-/** Reglas del reparto de pagos que la base aplica por su cuenta (migración 0008), por nombre de restricción. */
+/** Reglas de la etapa D (matriz editable y confirmación). */
+export const DRAFT_MESSAGES: Record<DraftRuleError['code'], string> = {
+  draft_not_editable: 'Esta matriz ya está confirmada y no se puede modificar (solo su responsable).',
+  project_has_confirmed_matrix:
+    'El proyecto ya tiene una matriz confirmada. Por ahora solo se admite una por proyecto (las versiones y adendas llegarán después).',
+  draft_empty: 'Añade al menos un ítem antes de confirmar la matriz.',
+  document_has_active_extraction: 'Este documento tiene un procesamiento en curso. Espera a que termine.',
+};
+
+/** Reglas que la base aplica por su cuenta (migraciones 0008 a 0010), por nombre de restricción. */
 const CONSTRAINT_MESSAGES: Record<string, string> = {
+  tdr_extractions_one_confirmed_per_project: DRAFT_MESSAGES.project_has_confirmed_matrix,
+  tdr_extractions_confirm_requires_items: DRAFT_MESSAGES.draft_empty,
+  tdr_items_rubro_not_blank: 'El rubro no puede quedar vacío.',
+  tdr_items_producto_not_blank: 'El producto no puede quedar vacío.',
+  tdr_items_subproducto_not_blank: 'El subproducto no puede ser solo espacios; déjalo vacío si no hay uno.',
+  tdr_items_cant_non_negative: 'La cantidad no puede ser negativa.',
+  tdr_items_dias_non_negative: 'Los días no pueden ser negativos.',
   payment_allocations_same_order: RULE_MESSAGES.allocation_other_order,
   payment_allocations_within_payment: RULE_MESSAGES.allocation_exceeds_payment,
   payment_allocations_within_line: RULE_MESSAGES.allocation_exceeds_balance,
@@ -53,6 +70,7 @@ export function toUserMessage(error: unknown): string {
     return 'El registro cambió desde que lo abriste. Recarga la página y vuelve a intentarlo.';
   }
   if (error instanceof BusinessRuleError) return RULE_MESSAGES[error.rule];
+  if (error instanceof DraftRuleError) return DRAFT_MESSAGES[error.code];
   if (error instanceof DbConfigError) {
     console.error('[erp] Configuración de base de datos:', error.message);
     return 'La aplicación no está configurada para conectarse a la base de datos.';
@@ -64,7 +82,11 @@ export function toUserMessage(error: unknown): string {
       : undefined;
   // Los triggers no informan la tabla en el error: se toma de la línea de contexto de PL/pgSQL.
   const where = typeof error === 'object' && error !== null && 'where' in error && typeof error.where === 'string' ? error.where : '';
-  const table = /check_assignment_worker_active/.test(where) ? 'tdr_item_assignments' : undefined;
+  const table = /check_assignment_worker_active/.test(where)
+    ? 'tdr_item_assignments'
+    : /protect_tdr_items/.test(where)
+      ? 'tdr_items'
+      : undefined;
   console.error('[erp] Error de servidor', { code: code ?? 'desconocido', constraint });
 
   switch (code) {

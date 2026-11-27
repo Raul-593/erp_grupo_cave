@@ -110,7 +110,18 @@ export function ModuleEmpty({
 }
 
 /** Selector de vista («chips» del prototipo) como enlaces: funciona sin JavaScript. */
-export function ViewChips({ basePath, current, options }: { basePath: string; current: string; options: readonly (readonly [string, string])[] }) {
+export function ViewChips({
+  basePath,
+  current,
+  options,
+  eventId,
+}: {
+  basePath: string;
+  current: string;
+  options: readonly (readonly [string, string])[];
+  /** Evento que se está viendo, para conservarlo al cambiar de vista. */
+  eventId?: string | null;
+}) {
   return (
     <nav aria-label="Vista" className="mb-4 flex flex-wrap gap-1.5">
       {options.map(([value, label]) => {
@@ -118,7 +129,7 @@ export function ViewChips({ basePath, current, options }: { basePath: string; cu
         return (
           <Link
             key={value}
-            href={`${basePath}?vista=${value}`}
+            href={`${basePath}?vista=${value}${eventId ? `&evento=${eventId}` : ''}`}
             aria-current={active ? 'page' : undefined}
             className={`rounded-[5px] border px-[11px] py-[5px] text-[10.5px] font-semibold tracking-[0.05em] uppercase ${
               active ? 'border-transparent bg-bl2 text-bl' : 'border-line text-mut hover:text-ink'

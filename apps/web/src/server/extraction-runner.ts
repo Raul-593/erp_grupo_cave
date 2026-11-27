@@ -11,7 +11,9 @@ import {
   failStaleExtractions,
   getDocumentFile,
   getPgErrorCode,
+  importProposalItems,
   PgErrorCode,
+  withTransaction,
 } from '@erp/db';
 import { readAiConfig, toPublicStatus, type AiConfig, type PublicAiStatus } from '@/integrations/ai/config';
 import { getAdapterFactory } from '@/integrations/ai/registry';
@@ -78,7 +80,13 @@ function enqueue(config: AiConfig, extractionId: string, document: { storageKey:
           maxRetries: config.maxRetries,
           claim: (id) => claimExtraction(db(), id),
           readPdf: async () => new Uint8Array(await fileStorage().read(document.storageKey)),
-          complete: (id, raw, meta) => completeExtraction(db(), id, raw, meta),
+          // Guarda el JSON y, en la misma transacción, lo copia a la matriz editable (etapa D, D-2).
+          complete: (id, raw, meta) =>
+            withTransaction(db(), async (tx) => {
+              const completed = await completeExtraction(tx, id, raw, meta);
+              if (completed) await importProposalItems(tx, id);
+              return completed;
+            }),
           fail: (id, error, meta) =>
             failExtraction(db(), id, { code: error.code, message: error.message, rawResponse: error.rawResponse ?? null }, meta),
           log,

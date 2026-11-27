@@ -8,6 +8,7 @@ import {
   CHECK_RESULTS,
   CONTRACT_STATUSES,
   MOUNT_STATUSES,
+  OPERATIONAL_STATUSES,
   PAYMENT_METHODS,
   PAYMENT_SUPPORTS,
   SUPPLIER_KINDS,
@@ -254,6 +255,22 @@ export const mountChangeSchema = z.object({
   value: z.enum(MOUNT_STATUSES, 'Estado de montaje no válido.'),
 });
 
+/** Estado operativo de un ítem; `version` vacía significa que aún no tiene registro de ejecución. */
+export const operationalChangeSchema = z.object({
+  itemId: planTarget.itemId,
+  version: planTarget.version,
+  value: z.enum(OPERATIONAL_STATUSES, 'Estado operativo no válido.'),
+});
+
+/** Responsable en bloque: los ítems de un evento del proyecto, o de uno de sus productos. */
+export const bulkResponsibleSchema = z.object({
+  projectId: uuid('Proyecto'),
+  eventId: uuid('Evento'),
+  rubro: optionalText(500, 'Producto'),
+  workerId: uuid('Responsable'),
+  onlyUnassigned: z.boolean(),
+});
+
 /** Resultado de un control del checklist previo. */
 export const checkChangeSchema = z.object({
   id: uuid('Control'),
@@ -343,6 +360,88 @@ export function parsePaymentAllocations(values: Record<string, string>, paymentA
 }
 
 /** Primer mensaje de error de un resultado fallido de zod, para ediciones de un solo campo. */
+// Etapa D: matriz editable -------------------------------------------------------------
+
+/** Número decimal opcional ≥ 0, con un máximo de decimales y de dígitos enteros (cant. y días). */
+const optionalQuantity = (label: string, decimals: number, integerDigits: number) =>
+  field()
+    .transform(parseDecimal)
+    .refine((v) => v !== undefined, `${label}: escribe un número (por ejemplo 2 o 1,5) o déjalo vacío si no se conoce.`)
+    .refine((v) => v == null || (v.split('.')[1] ?? '').length <= decimals, `${label}: máximo ${decimals} decimales.`)
+    .refine((v) => v == null || v.split('.')[0]!.length <= integerDigits, `${label} demasiado grande.`)
+    .transform((v) => v ?? null);
+
+/** Campos de una fila de la matriz con sus reglas (las mismas de la base). */
+export const matrixItemFields = {
+  rubro: requiredText(200, 'El rubro'),
+  producto: requiredText(300, 'El producto'),
+  subproducto: optionalText(200, 'Subproducto'),
+  descripcion: field()
+    .transform((v) => longTextOrNull(v) ?? '')
+    .refine((v) => v.length <= 4000, 'Descripción: máximo 4000 caracteres.'),
+  cant: optionalQuantity('Cantidad', 4, 10),
+  unidad: optionalText(60, 'Unidad'),
+  dias: optionalQuantity('Días', 2, 6),
+  observacion: optionalLongText(4000, 'Observación'),
+};
+
+const matrixItemTarget = { itemId: uuid('Ítem'), version };
+
+/** Cambio de un campo de una fila del borrador (se guarda al salir del campo). */
+export const matrixItemChangeSchema = z.discriminatedUnion('field', [
+  z.object({ ...matrixItemTarget, field: z.literal('rubro'), value: matrixItemFields.rubro }),
+  z.object({ ...matrixItemTarget, field: z.literal('producto'), value: matrixItemFields.producto }),
+  z.object({ ...matrixItemTarget, field: z.literal('subproducto'), value: matrixItemFields.subproducto }),
+  z.object({ ...matrixItemTarget, field: z.literal('descripcion'), value: matrixItemFields.descripcion }),
+  z.object({ ...matrixItemTarget, field: z.literal('cant'), value: matrixItemFields.cant }),
+  z.object({ ...matrixItemTarget, field: z.literal('unidad'), value: matrixItemFields.unidad }),
+  z.object({ ...matrixItemTarget, field: z.literal('dias'), value: matrixItemFields.dias }),
+  z.object({ ...matrixItemTarget, field: z.literal('observacion'), value: matrixItemFields.observacion }),
+]);
+
+/** Alta de una fila manual: rubro y producto obligatorios; el resto se completa en la tabla. */
+export const matrixItemFormSchema = z.object({
+  extractionId: uuid('Matriz'),
+  rubro: matrixItemFields.rubro,
+  producto: matrixItemFields.producto,
+  descripcion: matrixItemFields.descripcion,
+});
+
+export const matrixItemMoveSchema = z.object({
+  ...matrixItemTarget,
+  direction: z.enum(['up', 'down'], 'Dirección no válida.'),
+});
+
+export const matrixItemTargetSchema = z.object(matrixItemTarget);
+
+export const matrixConfirmSchema = z.object({ extractionId: uuid('Matriz'), version });
+
+/** Campos de la ficha propuesta que se pueden aplicar al proyecto (D-6). */
+export const FICHA_FIELDS = [
+  'codigo_proceso',
+  'objeto',
+  'monto',
+  'sedes',
+  'fecha_inicio',
+  'fecha_fin',
+  'plazo',
+  'administrador_contrato',
+] as const;
+export type FichaField = (typeof FICHA_FIELDS)[number];
+
+/**
+ * Aplicar la ficha propuesta: qué campos (o todos) y, si se elige, el contratante (uno
+ * existente o `nuevo`, creado con el nombre y RUC propuestos). Los valores se leen del JSON
+ * guardado en el servidor, nunca del navegador.
+ */
+export const fichaApplySchema = z.object({
+  projectId: uuid('Proyecto'),
+  version,
+  extractionId: uuid('Propuesta'),
+  fields: z.array(z.enum(FICHA_FIELDS, 'Campo de la ficha no válido.')).max(FICHA_FIELDS.length),
+  client: z.union([z.literal(''), z.literal('nuevo'), uuid('Contratante')]),
+});
+
 export function firstIssue(error: z.ZodError): string {
   return error.issues[0]?.message ?? 'Dato no válido.';
 }

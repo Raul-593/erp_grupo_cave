@@ -27,6 +27,7 @@ const fileKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`
 export function EvidenceUploader({ itemId, maxBytes }: { itemId: string; maxBytes: number }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLInputElement>(null);
   const [selected, setSelected] = useState<Selected[]>([]);
   const [busy, setBusy] = useState(false);
@@ -153,13 +154,31 @@ export function EvidenceUploader({ itemId, maxBytes }: { itemId: string; maxByte
             if (files.length > 0) addFiles(files);
           }}
         />
-        <button type="button" className="btn" disabled={busy} onClick={() => inputRef.current?.click()}>
+        {/* Abre directamente la cámara trasera en un celular; en un computador equivale a elegir un archivo. */}
+        <input
+          ref={cameraRef}
+          id="foto-camara"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          disabled={busy}
+          onChange={(event) => {
+            const files = Array.from(event.currentTarget.files ?? []);
+            event.currentTarget.value = '';
+            if (files.length > 0) addFiles(files);
+          }}
+        />
+        <button type="button" className="btn btn-p !py-2.5 md:hidden" disabled={busy} onClick={() => cameraRef.current?.click()}>
+          ◉ Tomar foto
+        </button>
+        <button type="button" className="btn !py-2.5 md:!py-[7px]" disabled={busy} onClick={() => inputRef.current?.click()}>
           ◎ {selected.length > 0 ? 'Añadir más' : 'Elegir fotografías'}
         </button>
       </div>
       <p className="mt-2 text-[11.5px] text-mut">
         JPEG, PNG o WebP · máximo {formatBytes(maxBytes)} por foto · puedes elegir varias. Las fotos elegidas no se guardan hasta que
-        pulses «Guardar». En un celular, el botón permite tomar la foto con la cámara.
+        pulses «Guardar». En un celular, «Tomar foto» abre la cámara y «Elegir fotografías» la galería.
       </p>
 
       {selected.length > 0 ? (

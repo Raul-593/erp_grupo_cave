@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { listItemEvidences, MOUNT_STATUSES } from '@erp/db';
+import { eventHref } from '@/components/operacion/events';
 import { DeleteEvidenceButton, EvidenceUploader } from '@/components/operacion/evidences';
+import { OperationalSelect } from '@/components/operacion/inline';
 import { DemoBanner } from '@/components/operacion/shared';
 import { Card, EmptyState, FichaGrid, Note, PageHeader, Pill } from '@/components/ui';
 import { formatBytes, formatDateTime } from '@/lib/format';
@@ -12,7 +14,7 @@ import { requirePageUser } from '@/server/auth';
 import { getCurrentProject } from '@/server/current-project';
 import { db } from '@/server/db';
 import { UUID } from '@/server/http';
-import { loadMatrixView } from '@/server/matrix';
+import { ALL_EVENTS, loadMatrixView } from '@/server/matrix';
 import { maxEvidenceBytes } from '@/server/storage';
 
 export const metadata: Metadata = { title: 'Fotografías del ítem' };
@@ -27,21 +29,24 @@ export default async function EvidenciasItemPage({ params }: { params: Promise<{
   if (!project) notFound();
   // El ítem debe pertenecer a la matriz confirmada vigente del proyecto seleccionado y al
   // alcance del usuario (el empleado de campo, solo sus ítems).
-  const view = await loadMatrixView(project.id, user);
+  const view = await loadMatrixView(project.id, user, ALL_EVENTS);
   const item = view?.items.find((row) => row.id === itemId);
   if (!view || !item) notFound();
 
   const evidences = await listItemEvidences(db(), item.id);
   const status = item.mountStatus ?? 'not_started';
   const mounted = MOUNT_STATUSES.indexOf(status) >= MOUNTED_FROM;
+  const event = view.events.find((candidate) => candidate.id === item.eventId) ?? null;
+  const operational = item.operationalStatus ?? 'pending';
+  const backHref = eventHref('/operacion/ejecucion', item.eventId);
 
   return (
     <>
       <PageHeader
         title={`Fotografías · ítem ${item.code}`}
-        subtitle={`${item.producto} · ${item.rubro}`}
+        subtitle={event ? `${item.subproducto ?? item.producto} · ${item.producto} · ${event.name}` : `${item.producto} · ${item.rubro}`}
         actions={
-          <Link href="/operacion/ejecucion" className="btn">
+          <Link href={backHref} className="btn">
             ← Volver a Ejecución
           </Link>
         }
@@ -54,16 +59,25 @@ export default async function EvidenciasItemPage({ params }: { params: Promise<{
             { label: 'Descripción', value: item.descripcion || '—' },
             { label: 'Responsable', value: item.workerName ?? '—' },
             { label: 'Proveedor', value: item.supplierName ?? '—' },
+            ...(event
+              ? [
+                  { label: 'Evento', value: event.name },
+                  {
+                    label: 'Estado operativo',
+                    value: <OperationalSelect itemId={item.id} itemLabel={item.code} status={operational} version={item.executionVersion} />,
+                  },
+                ]
+              : []),
             { label: 'Estado de montaje', value: MOUNT_STATUS[status] },
             {
               label: 'Verificado',
               value:
                 evidences.length === 0 ? (
                   <Pill tone="wa">Falta foto</Pill>
-                ) : mounted ? (
+                ) : (event ? operational === 'ready' : mounted) ? (
                   <Pill tone="ok">Sí</Pill>
                 ) : (
-                  <Pill>Sin montar</Pill>
+                  <Pill>{event ? 'Aún no está listo' : 'Sin montar'}</Pill>
                 ),
             },
           ]}

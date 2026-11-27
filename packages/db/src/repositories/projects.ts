@@ -94,14 +94,22 @@ export async function createProject(db: Queryable, input: ProjectInput): Promise
   return id;
 }
 
-/** Actualiza solo los campos presentes en `patch`, si la versión coincide. */
+/**
+ * Actualiza solo los campos presentes en `patch`, si la versión coincide. Con
+ * `fichaExtractionId` registra además de qué intento se aplicó la ficha propuesta (etapa D).
+ */
 export async function updateProject(
   db: Queryable,
   id: string,
   expectedVersion: number,
   patch: Partial<ProjectInput>,
+  options: { fichaExtractionId?: string } = {},
 ): Promise<void> {
   const set = buildSet(patch, EDITABLE_COLUMNS, 3);
+  if (options.fichaExtractionId !== undefined) {
+    set.values.push(options.fichaExtractionId);
+    set.sql = [set.sql, `ficha_extraction_id = $${set.values.length + 2}`].filter(Boolean).join(', ');
+  }
   if (set.values.length === 0) return;
   const { rowCount } = await db.query(`UPDATE projects SET ${set.sql} WHERE id = $1 AND version = $2`, [
     id,

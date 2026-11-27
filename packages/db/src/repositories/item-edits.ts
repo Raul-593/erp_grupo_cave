@@ -90,3 +90,39 @@ export async function saveItemPlan(
   ]);
   if (rowCount !== 1) throw new VersionConflictError('item_plans', itemId);
 }
+
+export interface BulkAssignTarget {
+  /** Evento cuyos ítems se asignan; null = ítems sin evento. */
+  eventId: string | null;
+  /** Limita a un producto (rubro) del evento; null = todos. */
+  rubro: string | null;
+  /** Solo los ítems que todavía no tienen responsable. */
+  onlyUnassigned: boolean;
+}
+
+/**
+ * Asigna un mismo responsable a los ítems de un evento (o de uno de sus productos) dentro de
+ * una matriz. Devuelve los ítems cuyo responsable cambió. La base solo admite trabajadores
+ * activos (trigger de tdr_item_assignments).
+ */
+export async function assignResponsibleBulk(
+  db: Queryable,
+  extractionId: string,
+  target: BulkAssignTarget,
+  workerId: string,
+): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>(
+    `INSERT INTO tdr_item_assignments (tdr_item_id, worker_id)
+     SELECT i.id, $5::uuid
+       FROM tdr_items i
+       LEFT JOIN tdr_item_assignments a ON a.tdr_item_id = i.id
+      WHERE i.extraction_id = $1
+        AND i.event_id IS NOT DISTINCT FROM $2::uuid
+        AND ($3::text IS NULL OR lower(btrim(i.rubro)) = lower(btrim($3::text)))
+        AND (a.tdr_item_id IS NULL OR (NOT $4::boolean AND a.worker_id <> $5::uuid))
+     ON CONFLICT (tdr_item_id) DO UPDATE SET worker_id = EXCLUDED.worker_id
+     RETURNING tdr_item_id AS id`,
+    [extractionId, target.eventId, target.rubro, target.onlyUnassigned, workerId],
+  );
+  return rows.map((row) => row.id);
+}

@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listPreEventChecks, MOUNT_STATUSES } from '@erp/db';
+import { EventChecklist } from '@/components/operacion/event-checklist';
+import { EventTabs } from '@/components/operacion/events';
 import { CheckResultSelect, MountSelect } from '@/components/operacion/inline';
 import { DemoBanner, Kpis, ModuleEmpty, ProductCell, RowList, ScopeBanner, StepDots } from '@/components/operacion/shared';
 import { Card, EmptyState, Note, PageHeader, Pill } from '@/components/ui';
@@ -25,7 +27,7 @@ const MOUNTED_FROM = MOUNT_STATUSES.indexOf('mounted');
 
 const percent = (part: number, total: number) => (total === 0 ? undefined : `${Math.round((part / total) * 100)}%`);
 
-export default async function EjecucionPage() {
+export default async function EjecucionPage({ searchParams }: { searchParams: Promise<{ evento?: string | string[] }> }) {
   const user = await requirePageUser('schedule.read');
   const canCreate = can(user.role, 'projects.write');
   // El estado de pago es dato financiero: el empleado de campo no lo ve.
@@ -33,12 +35,14 @@ export default async function EjecucionPage() {
   const canUpload = can(user.role, 'evidence.upload');
   const project = await getCurrentProject();
   if (!project) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="project" canCreate={canCreate} />;
-  const view = await loadMatrixView(project.id, user);
+  const view = await loadMatrixView(project.id, user, (await searchParams).evento);
   if (!view) return <ModuleEmpty title={TITLE} subtitle={SUBTITLE} reason="matrix" canCreate={canCreate} />;
 
   // Con alcance (campo), solo los controles previos que tiene a cargo.
   const checks = (await listPreEventChecks(db(), project.id)).filter((check) => !view.scoped || check.workerId === user.workerId);
   const { items, totals } = view;
+  // Proyecto con eventos (migración 0011): checklist por evento, usable desde el celular.
+  const byEvent = view.events.length > 0;
   // Sin fotografía y además sin ningún pago: lo que más urge revisar antes del evento. Sin
   // acceso a los pagos, la alerta es solo la falta de fotografía.
   const alerts = items.filter((item) => item.evidenceCount === 0 && (!showPayments || item.paymentStatus === 'unpaid')).length;
@@ -48,8 +52,19 @@ export default async function EjecucionPage() {
       <PageHeader title={TITLE} subtitle={SUBTITLE} />
       {view.demo ? <DemoBanner source={view.matrix.model} /> : null}
       {view.scoped ? <ScopeBanner count={items.length} /> : null}
+      <EventTabs basePath="/operacion/ejecucion" events={view.events} current={view.event} />
       <Kpis
         items={[
+          ...(byEvent
+            ? [
+                {
+                  label: 'Listos',
+                  value: `${totals.readyCount} de ${totals.itemCount}`,
+                  hint: percent(totals.readyCount, totals.itemCount),
+                  tone: totals.itemCount > 0 && totals.readyCount === totals.itemCount ? ('ok' as const) : undefined,
+                },
+              ]
+            : []),
           {
             label: 'Entregables montados',
             value: `${totals.mountedCount} de ${totals.itemCount}`,
@@ -73,7 +88,16 @@ export default async function EjecucionPage() {
         ]}
       />
 
-      <Card title="Checklist de entregables">
+      <Card title={`Checklist de entregables${view.event ? ` · ${view.event.name}` : ''}`}>
+        {byEvent ? (
+          items.length === 0 ? (
+            <EmptyState icon="▦" title="Sin ítems en este evento">
+              <p>{view.scoped ? 'No tienes ítems a tu cargo en este evento. Prueba con otro evento.' : 'Este evento todavía no tiene ítems.'}</p>
+            </EmptyState>
+          ) : (
+            <EventChecklist items={items} canUpload={canUpload} />
+          )
+        ) : (
         <div className="overflow-x-auto">
           <table className="tbl">
             <thead>
@@ -140,6 +164,7 @@ export default async function EjecucionPage() {
             </tbody>
           </table>
         </div>
+        )}
       </Card>
 
       <Card title="Checklist previo al evento">
@@ -168,7 +193,7 @@ export default async function EjecucionPage() {
       </Card>
 
       <Note>
-        Un ítem queda <b>verificado</b> cuando está montado y tiene al menos una fotografía. El estado de montaje y el
+        Un ítem queda <b>verificado</b> cuando está {byEvent ? 'listo' : 'montado'} y tiene al menos una fotografía. El estado de montaje y el
         resultado de cada control se guardan al cambiarlos. Las fotografías se suben y se
         consultan con el botón de la columna «Fotos».
       </Note>
