@@ -223,7 +223,11 @@ Pruebas de cada acción (valor válido, inválido, conflicto de versión, ítem 
 - **Sin verificar:** tomar la foto con la cámara de un celular (la aplicación solo escucha en el equipo local) y fotos reales de varios megabytes.
 - **No incluido:** miniaturas, limpieza de metadatos EXIF, HEIC, editar la descripción después de cargar, revisión y publicación al cliente (Fase 7).
 
-Sin commits de las etapas F, F2 y G. Con esto queda cerrada la tarea «datos de demostración y fotografías». Siguientes pasos posibles, cada uno con su propio plan: migración para calcular lo pagado por ítem desde los pagos; etapa D (matriz editable) y adaptador de IA cuando haya clave; crear y reprogramar actividades.
+**2026-11-27 — Ajuste pedido por el usuario: guardar las fotografías con un botón.** Elegir archivos ya no los envía: quedan en una lista «sin guardar» con vista previa y opción de quitar cada uno; solo se guardan al pulsar «Guardar N fotografías» («Descartar selección» los suelta). Las rechazadas por el servidor se quedan en la lista con su motivo; el navegador avisa al cerrar la pestaña con fotos sin guardar. Cambio solo en `components/operacion/evidences.tsx`. Verificado: lint, tipos, 79 + 113 pruebas y build; en el navegador (puerto 3000), tras elegir tres archivos el servidor seguía con 0 fotografías; se quitó una, se pulsó «Guardar» y quedó 1 guardada y el PDF renombrado rechazado en la lista; la foto de prueba se eliminó después.
+
+**Consulta del usuario sobre sus fotos (2026-11-27):** la base no lleva historial de cargas ni de eliminaciones; `item_evidences` estaba vacía y sin archivos. Los contadores de actividad de PostgreSQL para esa tabla marcaban 6 inserciones y 6 borrados desde su creación; 2 y 2 eran de la prueba de la etapa G, así que al usuario le corresponden 4 cargas y 4 eliminaciones (dato aproximado: los contadores no guardan fechas ni qué fotos eran).
+
+El usuario confirmó F, F2 y G en `4b71ac5`; el ajuste del botón «Guardar» está sin confirmar. Con esto queda cerrada la tarea «datos de demostración y fotografías». Siguientes pasos posibles, cada uno con su propio plan: migración para calcular lo pagado por ítem desde los pagos; etapa D (matriz editable) y adaptador de IA cuando haya clave; crear y reprogramar actividades.
 
 ---
 

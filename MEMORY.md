@@ -4,7 +4,7 @@
 - **Tarea «datos de demostración y fotografías» completada el 2026-11-27** (PLAN.md E7–E9): demostración cargada, Planificación/Abastecimiento/Ejecución con edición en pantalla, y fotos por ítem. Espera la revisión final del usuario.
 - El proyecto 1 («Prueba 1») tiene cargados los datos del prototipo como extracción `demo` confirmada: 10 ítems, 5 órdenes, 4 pagos, 10 actividades, 6 controles previos, 5 cotizaciones.
 - Tarea «Operación › Requerimiento» en pausa: etapas A–C hechas (C sin proveedor de IA; falta SDK y adaptador), D pendiente.
-- Commits hasta `cb60028` (etapa E, hecho por el usuario); F, F2 y G están sin confirmar en el árbol de trabajo.
+- Commits hasta `4b71ac5` (F, F2 y G, hecho por el usuario). Sin confirmar: fotos con botón «Guardar» (se eligen, quedan «sin guardar» y se envían al pulsarlo).
 
 ## 2. Decisiones aprobadas
 - BD local `grupo_cave_v1`, usuario `grupo_cave`, PostgreSQL 18.4; esquemas `erp` (dev) y `erp_test` (pruebas). Evitar funciones exclusivas de PG 18.
@@ -33,6 +33,7 @@
 - `.gitignore`: usar `/storage/` (con barra inicial); `storage/` ignoraba también el código del adaptador.
 - Las tablas de `0007` solo aceptan ítems de una matriz confirmada y del mismo proyecto (triggers).
 - Filas creadas en una misma transacción comparten `created_at`: ordenar por otra columna (`sort_order`, nombre).
+- No hay historial de cambios ni de borrados: para «cuántas subí/eliminé» solo existen los contadores de `pg_stat_user_tables` (aproximados, sin fechas).
 - Scripts de Node sin empaquetador: importaciones relativas con extensión `.ts`, sin alias `@/`.
 - Migraciones sin esquema fijo; funciones con `SET search_path FROM CURRENT`. RESTRICT lanza 23001.
 - `pg` devuelve `date` y `numeric` como texto: sumar en SQL o con `lib/money.ts` (centavos, BigInt), nunca con coma flotante.
