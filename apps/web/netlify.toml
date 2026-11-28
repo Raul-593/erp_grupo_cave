@@ -1,0 +1,10 @@
+# Publicación en Netlify (PLAN.md, parte S, paso S7). Monorepo pnpm: la base es la raíz del
+# repositorio y el paquete es apps/web (desplegar con `netlify deploy --build --filter web`).
+# Los secretos no van aquí: se cargan en las variables de entorno del sitio en Netlify.
+[build]
+  command = "pnpm --filter web build"
+  publish = ".next"
+
+[build.environment]
+  # package.json exige Node >= 24.11; pnpm se toma de "packageManager".
+  NODE_VERSION = "24.11.0"
