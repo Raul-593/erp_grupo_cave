@@ -29,7 +29,9 @@ async function migrate(target: DbTarget): Promise<void> {
   const config = loadDbConfig(target);
   console.log(`\n[${target}] Aplicando migraciones en el esquema "${config.schema}"...`);
   const applied = await runner({
-    databaseUrl: config.connectionString,
+    databaseUrl: config.sslCa
+      ? { connectionString: config.connectionString, ssl: { ca: config.sslCa, rejectUnauthorized: true } }
+      : config.connectionString,
     dir: MIGRATIONS_DIR,
     direction: 'up',
     migrationsTable: MIGRATIONS_TABLE,
@@ -81,16 +83,17 @@ async function main(): Promise<void> {
   const { values } = parseArgs({
     options: { target: { type: 'string' }, status: { type: 'boolean', default: false } },
   });
-  const { host, port, database, user } = summarizeConnection(loadDbConfig('dev').connectionString);
+  const { host, port, database, user } = summarizeConnection(loadDbConfig(values.target === 'supabase' ? 'supabase' : 'dev').connectionString);
   console.log(`Base "${database}" en ${host}:${port}, usuario "${user}".`);
 
   if (values.status) {
+    if (values.target === 'supabase') return status('supabase');
     await status('dev');
     await status('test');
     return;
   }
-  if (values.target !== 'dev' && values.target !== 'test') {
-    throw new Error('Indique --target=dev o --target=test.');
+  if (values.target !== 'dev' && values.target !== 'test' && values.target !== 'supabase') {
+    throw new Error('Indique --target=dev, --target=test o --target=supabase.');
   }
   await migrate(values.target);
 }

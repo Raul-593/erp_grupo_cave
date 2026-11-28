@@ -165,14 +165,22 @@ export async function importCostMatrix(db: Queryable, options: CostMatrixImportO
     clientId = await insertId(db, `INSERT INTO clients (name) VALUES ($1) RETURNING id`, [dataset.project.client.trim()]);
     add('clients');
   }
-  const company = dataset.project.company
-    ? await db.query<{ id: string }>(`SELECT id FROM companies WHERE lower(btrim(name)) = lower(btrim($1)) LIMIT 1`, [dataset.project.company])
-    : { rows: [] };
+  let companyId: string | null = null;
+  if (dataset.project.company) {
+    const company = await db.query<{ id: string }>(`SELECT id FROM companies WHERE lower(btrim(name)) = lower(btrim($1)) LIMIT 1`, [
+      dataset.project.company,
+    ]);
+    companyId = company.rows[0]?.id ?? null;
+    if (!companyId) {
+      companyId = await insertId(db, `INSERT INTO companies (name) VALUES ($1) RETURNING id`, [dataset.project.company.trim()]);
+      add('companies');
+    }
+  }
   const projectId = await insertId(
     db,
     `INSERT INTO projects (client_id, company_id, name, process_code, purpose, venues)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-    [clientId, company.rows[0]?.id ?? null, dataset.project.name.trim(), dataset.project.processCode, dataset.project.purpose, dataset.project.venues],
+    [clientId, companyId, dataset.project.name.trim(), dataset.project.processCode, dataset.project.purpose, dataset.project.venues],
   );
   add('projects');
 

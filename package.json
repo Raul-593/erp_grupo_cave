@@ -21,6 +21,11 @@
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
-    "test": "pnpm -r run test"
+    "test": "pnpm -r run test",
+    "db:migrate:supabase": "pnpm --filter @erp/db run db:migrate:supabase",
+    "db:status:supabase": "pnpm --filter @erp/db run db:status:supabase",
+    "db:supabase:setup": "pnpm --filter @erp/db run db:supabase:setup",
+    "db:supabase:admin": "pnpm --filter web run db:supabase:admin",
+    "db:supabase:storage": "pnpm --filter web run db:supabase:storage"
   }
 }

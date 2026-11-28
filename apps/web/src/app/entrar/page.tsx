@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { connection } from 'next/server';
 import { listUsers, USER_ROLES } from '@erp/db';
+import { AuthFrame as Frame } from '@/components/session/AuthFrame';
+import { PasswordSignInForm } from '@/components/session/PasswordForms';
 import { SignInForm } from '@/components/session/SignInForm';
 import { homePath, ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/domain/access/permissions';
 import { authProvider } from '@/integrations/auth/config';
@@ -11,32 +13,16 @@ import { db } from '@/server/db';
 
 export const metadata: Metadata = { title: 'Entrar' };
 
-function Frame({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="grid min-h-screen place-items-center bg-bg p-4">
-      <section className="card w-full max-w-[440px]">
-        <header className="flex items-center gap-2.5 border-b border-line px-5 py-4">
-          <div className="grid size-[26px] flex-none place-items-center rounded-[7px] bg-bl text-xs font-semibold text-white">C</div>
-          <div>
-            <b className="text-sm font-semibold tracking-[0.06em]">CAVE ERP</b>
-            <span className="mt-px block text-[9px] tracking-[0.14em] text-mut2 uppercase">Ingreso</span>
-          </div>
-        </header>
-        <div className="grid gap-4 px-5 py-5">{children}</div>
-      </section>
-    </main>
-  );
-}
-
 /**
- * Ingreso de desarrollo (decisión U-D1): sin contraseña y solo en este computador con la base
- * local. El ingreso con correo y contraseña llega con Supabase Auth (parte S del plan).
+ * Ingreso. Con Supabase Auth (parte S): correo y contraseña. En desarrollo (decisión U-D1):
+ * «Entrar como…» sin contraseña, solo en este computador y con la base local.
  */
 export default async function EntrarPage() {
   await connection();
   let problem: string | null = null;
+  let providerId: string | null = null;
   try {
-    await authProvider();
+    providerId = (await authProvider()).id;
   } catch (error) {
     if (!(error instanceof AuthConfigError)) throw error;
     problem = error.message;
@@ -51,6 +37,21 @@ export default async function EntrarPage() {
   }
 
   const current = await getSessionUser();
+  if (providerId === 'supabase') {
+    return (
+      <Frame>
+        {current ? (
+          <p className="text-[12.5px]">
+            Ya entraste como <b className="font-semibold">{current.fullName}</b>.{' '}
+            <Link href={homePath(current.role)} className="text-bl hover:underline">
+              Continuar
+            </Link>
+          </p>
+        ) : null}
+        <PasswordSignInForm />
+      </Frame>
+    );
+  }
   const users = await listUsers(db(), { onlyActive: true });
   const groups = USER_ROLES.map((role) => ({
     label: ROLE_LABELS[role],

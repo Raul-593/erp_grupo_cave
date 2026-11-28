@@ -9,6 +9,22 @@ export interface FileStorage {
   read(key: string): Promise<Buffer>;
   /** Elimina el archivo; no falla si ya no existe. */
   remove(key: string): Promise<void>;
+  /**
+   * Enlace de lectura que caduca en `seconds` (solo almacenamiento remoto). Evita que los archivos
+   * grandes pasen por el servidor; nunca es un enlace público permanente.
+   */
+  signedReadUrl?(key: string, seconds: number): Promise<string>;
+  /**
+   * Permiso de un solo uso para que el navegador suba el archivo directamente a esa clave (solo
+   * almacenamiento remoto). El servidor valida el archivo después, antes de registrarlo.
+   */
+  signedUpload?(key: string): Promise<SignedUpload>;
+}
+
+export interface SignedUpload {
+  /** URL a la que el navegador envía el archivo con PUT (incluye el permiso). */
+  url: string;
+  token: string;
 }
 
 export class StorageKeyError extends Error {

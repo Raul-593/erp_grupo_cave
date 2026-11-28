@@ -5,6 +5,7 @@
  *
  *   pnpm db:import:matrix --data=<archivo.json> --dry-run   valida y muestra qué haría; no escribe
  *   pnpm db:import:matrix --data=<archivo.json>             carga el proyecto
+ *   … --target=supabase                                     en Supabase (SUPABASE_DATABASE_URL y Storage)
  *
  * Es idempotente: si el contratante ya tiene un proyecto con ese nombre, no hace nada. El JSON
  * vive en scripts/local/ (carpeta ignorada por Git: contiene nombres de proveedores y montos).
@@ -25,11 +26,18 @@ import {
 } from '@erp/db';
 import { SCHEMA_VERSION } from '../src/domain/tdr-extraction/contract.ts';
 import { createLocalStorage } from '../src/integrations/storage/local.ts';
+import { createSupabaseStorage, supabaseAdminClient } from '../src/integrations/storage/supabase.ts';
 import { buildTextPdf } from '../src/lib/simple-pdf.ts';
 
 const SCRIPT_DIR = import.meta.dirname;
 const WORKSPACE_ROOT = path.resolve(SCRIPT_DIR, '../../..');
 const DEFAULT_DATA = path.join(SCRIPT_DIR, 'local', 'graduaciones-unemi.json');
+
+function required(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`Falta ${name}.`);
+  return value;
+}
 
 /** Misma regla que `storageRoot()` del servidor web. */
 function storageRoot(): string {
@@ -72,9 +80,10 @@ const sum = (values: (string | null)[]): string => {
 
 async function main(): Promise<void> {
   const { values } = parseArgs({
-    options: { 'dry-run': { type: 'boolean', default: false }, data: { type: 'string' } },
+    options: { 'dry-run': { type: 'boolean', default: false }, data: { type: 'string' }, target: { type: 'string', default: 'dev' } },
   });
-  const config = loadDbConfig('dev');
+  if (values.target !== 'dev' && values.target !== 'supabase') throw new Error('--target debe ser dev o supabase.');
+  const config = loadDbConfig(values.target);
   const { host, port, database, user } = summarizeConnection(config.connectionString);
   console.log(`Base "${database}" en ${host}:${port}, usuario "${user}", esquema "${config.schema}".`);
 
@@ -91,6 +100,7 @@ async function main(): Promise<void> {
   }
 
   const pool = createPool(config, { max: 2 });
+  console.log(`Destino: ${values.target === 'supabase' ? 'SUPABASE (producción)' : 'base local'}.`);
   try {
     const existing = await findProjectByName(pool, dataset.project.client, dataset.project.name);
     if (existing) {
@@ -102,7 +112,10 @@ async function main(): Promise<void> {
       return;
     }
 
-    const storage = createLocalStorage(storageRoot());
+    const storage =
+      values.target === 'supabase'
+        ? createSupabaseStorage(supabaseAdminClient(required('SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY')))
+        : createLocalStorage(storageRoot());
     const pdf = originPdf(dataset, itemCount);
     let storageKey: string | null = null;
     let committed = false;

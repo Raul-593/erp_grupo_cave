@@ -21,10 +21,13 @@ export function UserForm({
   initial,
   workers,
   suppliers,
+  credentials = false,
 }: {
   initial?: Record<string, string>;
   workers: LinkOption[];
   suppliers: LinkOption[];
+  /** Ingreso con correo y contraseña (Supabase Auth): correo obligatorio y contraseña temporal. */
+  credentials?: boolean;
 }) {
   const [state, action, pending] = useActionState(saveUser, IDLE);
   const values = state.values ?? initial ?? { active: 'on', role: 'field' };
@@ -45,12 +48,33 @@ export function UserForm({
       </Field>
       <Field
         name="email"
-        label="Correo (opcional por ahora)"
+        label={credentials ? 'Correo (con él entra al sistema)' : 'Correo (opcional en desarrollo)'}
         errors={errors}
-        hint="Será obligatorio para entrar cuando se active el ingreso con Supabase."
+        hint={credentials ? undefined : 'Será obligatorio para entrar cuando se active el ingreso con Supabase.'}
       >
-        <input type="email" {...fieldProps('email', values, errors)} maxLength={200} autoComplete="off" />
+        <input type="email" {...fieldProps('email', values, errors)} maxLength={200} autoComplete="off" required={credentials} />
       </Field>
+      {credentials ? (
+        <Field
+          name="tempPassword"
+          label={editing ? 'Contraseña temporal nueva (opcional)' : 'Contraseña temporal'}
+          errors={errors}
+          hint={
+            editing
+              ? 'Déjala vacía para no cambiarla. Si escribes una, la persona deberá cambiarla al entrar.'
+              : 'Entrégasela a la persona: al entrar por primera vez deberá cambiarla. Mínimo 10 caracteres.'
+          }
+        >
+          <input
+            type="text"
+            {...fieldProps('tempPassword', {}, errors)}
+            maxLength={200}
+            autoComplete="new-password"
+            spellCheck={false}
+            required={!editing}
+          />
+        </Field>
+      ) : null}
       <Field name="role" label="Tipo de usuario" errors={errors} hint={ROLE_DESCRIPTIONS[role]}>
         <select
           {...fieldProps('role', values, errors)}

@@ -119,7 +119,7 @@ describe('estructura', () => {
     expect(rows[0]?.schema).toBe(config.schema);
   });
 
-  it('tiene las tablas de las migraciones 0001-0011', async () => {
+  it('tiene las tablas de las migraciones 0001-0012', async () => {
     const { rows } = await client.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = $1 AND tablename <> 'pgmigrations' ORDER BY 1`,
       [config.schema],
@@ -209,6 +209,15 @@ describe('estructura', () => {
       // Mismos valores, ni más ni menos: cada uno aparece entre comillas en el CHECK.
       expect(def.match(/'[^']+'/g)?.map((value) => value.slice(1, -1)).sort()).toEqual([...values].sort());
     }
+  });
+
+  it('tiene RLS activo en todas las tablas (0012)', async () => {
+    const { rows } = await client.query<{ table: string }>(
+      `SELECT c.relname AS table FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = $1 AND c.relkind = 'r' AND c.relname <> 'pgmigrations' AND NOT c.relrowsecurity`,
+      [config.schema],
+    );
+    expect(rows.map((row) => row.table)).toEqual([]);
   });
 
   it('devuelve date y numeric como texto exacto', async () => {

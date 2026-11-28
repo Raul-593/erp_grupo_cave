@@ -10,8 +10,8 @@ import { describe, expect, it } from 'vitest';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 
-/** Acciones que no necesitan sesión previa: entrar y salir. */
-const PUBLIC_ACTIONS = new Set(['signInAsDev', 'signOut']);
+/** Acciones sin permiso propio: entrar y salir, y cambiar la contraseña propia (exige sesión). */
+const PUBLIC_ACTIONS = new Set(['signInAsDev', 'signInWithPassword', 'signOut', 'changeOwnPassword']);
 
 function filesUnder(dir: string, name: RegExp): string[] {
   return readdirSync(dir).flatMap((entry) => {

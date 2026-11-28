@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { UserForm } from '@/components/forms/UserForm';
 import { Card, PageHeader } from '@/components/ui';
+import { configuredAuthProvider } from '@/integrations/auth/config';
 import { requirePageUser } from '@/server/auth';
 import { userFormOptions } from '@/server/user-form-options';
 
@@ -13,7 +14,7 @@ export default async function NuevoUsuarioPage() {
     <>
       <PageHeader title="Nuevo usuario" subtitle="El tipo de usuario define qué puede ver y cambiar." />
       <Card title="Datos del usuario">
-        <UserForm workers={options.workers} suppliers={options.suppliers} />
+        <UserForm workers={options.workers} suppliers={options.suppliers} credentials={configuredAuthProvider() === 'supabase'} />
       </Card>
     </>
   );

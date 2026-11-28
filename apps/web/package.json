@@ -13,10 +13,15 @@
     "test": "vitest run",
     "db:seed:demo": "node --env-file=../../.env scripts/seed-demo.ts",
     "db:convert:paid": "node --env-file=../../.env scripts/convert-paid.ts",
-    "db:import:matrix": "node --env-file=../../.env scripts/import-cost-matrix.ts"
+    "db:import:matrix": "node --env-file=../../.env scripts/import-cost-matrix.ts",
+    "db:supabase:admin": "node --env-file=../../.env scripts/supabase-admin.ts",
+    "db:supabase:storage": "node --env-file=../../.env scripts/supabase-storage.ts",
+    "start:supabase": "node scripts/start-supabase.mjs"
   },
   "dependencies": {
     "@erp/db": "workspace:*",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.2",
     "@tanstack/react-table": "^9.3.1",
     "next": "^16.4.6",
     "react": "^19.3.1",

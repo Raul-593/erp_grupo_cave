@@ -249,3 +249,26 @@ describe('intentos de extracción', () => {
     expect(await getExtraction(client, b.id)).toMatchObject({ status: 'pending' });
   });
 });
+
+describe('configuración de una base remota', () => {
+  const remote = { DATABASE_URL: 'postgres://u:c@aws-0-x.pooler.supabase.com:5432/postgres' };
+  it('exige el certificado de la CA y nunca conecta sin verificar', () => {
+    expect(() => loadDbConfig('dev', remote)).toThrow(/certificado/);
+    expect(loadDbConfig('dev', { ...remote, DATABASE_SSL_CA: '-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----' }).sslCa).toBe(
+      '-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----',
+    );
+    expect(() => loadDbConfig('dev', { ...remote, DATABASE_SSL_CA_FILE: 'no-existe.crt' })).toThrow(/No se pudo leer/);
+  });
+
+  it('la base local no necesita certificado y Supabase usa su propia URL y el esquema erp', () => {
+    expect(loadDbConfig('dev', { DATABASE_URL: 'postgres://u:c@localhost:5432/base' }).sslCa).toBeNull();
+    expect(() => loadDbConfig('supabase', { DATABASE_URL: 'postgres://u:c@localhost/base' })).toThrow(/SUPABASE_DATABASE_URL/);
+    const config = loadDbConfig('supabase', {
+      DATABASE_URL: 'postgres://u:c@localhost/base',
+      DATABASE_SCHEMA: 'otro',
+      SUPABASE_DATABASE_URL: remote.DATABASE_URL,
+      DATABASE_SSL_CA: 'pem',
+    });
+    expect(config).toMatchObject({ target: 'supabase', schema: 'erp', sslCa: 'pem', connectionString: remote.DATABASE_URL });
+  });
+});

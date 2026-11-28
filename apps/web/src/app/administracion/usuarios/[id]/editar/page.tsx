@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getUser } from '@erp/db';
 import { UserForm } from '@/components/forms/UserForm';
 import { Card, PageHeader } from '@/components/ui';
+import { configuredAuthProvider } from '@/integrations/auth/config';
 import { requirePageUser } from '@/server/auth';
 import { db } from '@/server/db';
 import { UUID } from '@/server/http';
@@ -25,6 +26,7 @@ export default async function EditarUsuarioPage({ params }: { params: Promise<{ 
         <UserForm
           workers={options.workers}
           suppliers={options.suppliers}
+          credentials={configuredAuthProvider() === 'supabase'}
           initial={{
             id: user.id,
             version: String(user.version),

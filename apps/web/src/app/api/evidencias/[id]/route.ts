@@ -3,7 +3,7 @@ import { authorize } from '@/server/auth';
 import { db } from '@/server/db';
 import { toUserMessage } from '@/server/errors';
 import { contentDisposition, jsonError, UUID } from '@/server/http';
-import { fileStorage } from '@/server/storage';
+import { fileStorage, SIGNED_URL_SECONDS } from '@/server/storage';
 
 /** Muestra una fotografía de evidencia a quien puede ver su ítem (sin enlaces públicos). */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
@@ -16,6 +16,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (!auth.ok) return jsonError(auth.status === 401 ? 401 : 404, auth.status === 401 ? auth.message : 'Fotografía no encontrada.');
     const storage = fileStorage();
     if (!evidence || evidence.storageProvider !== storage.provider) return jsonError(404, 'Fotografía no encontrada.');
+    // Almacenamiento remoto: enlace temporal, sin que el archivo pase por este servidor.
+    if (storage.signedReadUrl) {
+      try {
+        const url = await storage.signedReadUrl(evidence.storageKey, SIGNED_URL_SECONDS);
+        return new Response(null, { status: 302, headers: { Location: url, 'Cache-Control': 'private, no-store' } });
+      } catch {
+        console.error('[erp] No se pudo crear el enlace temporal', { id: evidence.id });
+        return jsonError(404, 'El archivo no está disponible.');
+      }
+    }
     let bytes: Buffer;
     try {
       bytes = await storage.read(evidence.storageKey);

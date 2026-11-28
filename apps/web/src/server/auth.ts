@@ -7,6 +7,7 @@ import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import {
   getUser,
+  getUserByAuthSubject,
   isCheckAssignedTo,
   isItemAssignedTo,
   listWorkerProjectIds,
@@ -16,7 +17,7 @@ import {
 } from '@erp/db';
 import { can, homePath, scopeOf, type Permission } from '@/domain/access/permissions';
 import { authProvider } from '@/integrations/auth/config';
-import { AuthConfigError } from '@/integrations/auth/types';
+import { AuthConfigError, type AuthIdentity } from '@/integrations/auth/types';
 import { db } from './db';
 
 export interface SessionUser {
@@ -28,28 +29,41 @@ export interface SessionUser {
   supplierId: string | null;
 }
 
+/** Página donde se cambia la contraseña propia (solo con Supabase Auth). */
+export const CHANGE_PASSWORD_PATH = '/cuenta/contrasena';
+
 export const NO_SESSION = 'Tu sesión terminó o no has entrado. Vuelve a entrar.';
 export const FORBIDDEN = 'No tienes permiso para esta acción.';
 
 /** Usuario activo de la petición actual (una sola consulta por petición), o null. */
-export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
-  let userId: string | null;
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => (await getSession())?.user ?? null);
+
+/**
+ * Sesión de la petición: el usuario activo y si debe cambiar su contraseña temporal (Supabase).
+ * Una identidad de Supabase sin usuario de la aplicación, o con el usuario desactivado, no
+ * tiene sesión.
+ */
+export const getSession = cache(async (): Promise<{ user: SessionUser; mustChangePassword: boolean } | null> => {
+  let identity: AuthIdentity | null;
   try {
-    userId = await (await authProvider()).currentUserId();
+    identity = await (await authProvider()).currentIdentity();
   } catch (error) {
     if (error instanceof AuthConfigError) return null;
     throw error;
   }
-  if (!userId) return null;
-  const user = await getUser(db(), userId);
+  if (!identity) return null;
+  const user = identity.kind === 'user' ? await getUser(db(), identity.userId) : await getUserByAuthSubject(db(), identity.authSubject);
   if (!user || !user.active) return null;
   return {
-    id: user.id,
-    fullName: user.fullName,
-    email: user.email,
-    role: user.role,
-    workerId: user.workerId,
-    supplierId: user.supplierId,
+    user: {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      workerId: user.workerId,
+      supplierId: user.supplierId,
+    },
+    mustChangePassword: identity.kind === 'subject' && identity.mustChangePassword,
   };
 });
 
@@ -57,8 +71,11 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
  * Para páginas: sin sesión lleva a «Entrar»; sin el permiso, a la página de inicio del rol.
  */
 export async function requirePageUser(...permissions: Permission[]): Promise<SessionUser> {
-  const user = await getSessionUser();
-  if (!user) redirect('/entrar');
+  const session = await getSession();
+  if (!session) redirect('/entrar');
+  // Quien entró con una contraseña temporal debe cambiarla antes de usar el sistema.
+  if (session.mustChangePassword) redirect(CHANGE_PASSWORD_PATH);
+  const user = session.user;
   if (permissions.some((permission) => !can(user.role, permission))) redirect(homePath(user.role));
   return user;
 }

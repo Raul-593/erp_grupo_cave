@@ -12,9 +12,9 @@ const TWELVE_HOURS = 60 * 60 * 12;
 
 export const devAuthProvider: AuthProvider & { signInAs(userId: string): Promise<void> } = {
   id: 'dev',
-  async currentUserId() {
+  async currentIdentity() {
     const value = (await cookies()).get(DEV_SESSION_COOKIE)?.value;
-    return value && UUID.test(value) ? value : null;
+    return value && UUID.test(value) ? { kind: 'user', userId: value } : null;
   },
   async signOut() {
     (await cookies()).delete(DEV_SESSION_COOKIE);

@@ -1,4 +1,4 @@
-export { loadDbConfig, summarizeConnection, DbConfigError } from './config.ts';
+export { loadDbConfig, summarizeConnection, readSslCa, DbConfigError } from './config.ts';
 export type { DbConfig, DbTarget, ConnectionSummary } from './config.ts';
 export { createPool, withTransaction } from './client.ts';
 export { PgErrorCode, getPgErrorCode } from './errors.ts';

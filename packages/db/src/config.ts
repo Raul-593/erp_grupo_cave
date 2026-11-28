@@ -3,13 +3,22 @@
  * Nunca registra ni devuelve la contraseña.
  */
 
-export type DbTarget = 'dev' | 'test';
+import { readFileSync } from 'node:fs';
+
+/**
+ * dev: base de la aplicación (DATABASE_URL); test: esquema de pruebas en la misma base;
+ * supabase: proyecto de Supabase con el usuario administrador (SUPABASE_DATABASE_URL), solo
+ * para scripts de migración y carga. La aplicación publicada usa `dev` con su propia URL.
+ */
+export type DbTarget = 'dev' | 'test' | 'supabase';
 
 export interface DbConfig {
   readonly target: DbTarget;
   readonly connectionString: string;
   /** Esquema donde viven las tablas de la aplicación para este entorno. */
   readonly schema: string;
+  /** Certificado de la CA del servidor (PEM) para verificar TLS; null en una base local. */
+  readonly sslCa: string | null;
 }
 
 export interface ConnectionSummary {
@@ -19,7 +28,8 @@ export interface ConnectionSummary {
   readonly user: string;
 }
 
-const DEFAULT_SCHEMAS: Readonly<Record<DbTarget, string>> = { dev: 'erp', test: 'erp_test' };
+const DEFAULT_SCHEMAS: Readonly<Record<DbTarget, string>> = { dev: 'erp', test: 'erp_test', supabase: 'erp' };
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 const SCHEMA_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/;
 const PLACEHOLDER_PASSWORD = 'CAMBIAR_CONTRASENA';
 
@@ -37,16 +47,41 @@ function readSchema(value: string | undefined, target: DbTarget): string {
   return schema;
 }
 
+/**
+ * Certificado para verificar TLS con una base remota: DATABASE_SSL_CA (contenido PEM, cómodo en
+ * un hosting) o DATABASE_SSL_CA_FILE (ruta a un archivo .crt fuera de Git). Una base remota sin
+ * certificado se rechaza: nunca se conecta sin verificar el servidor.
+ */
+export function readSslCa(env: NodeJS.ProcessEnv, host: string): string | null {
+  if (LOOPBACK.has(host.toLowerCase())) return null;
+  const inline = env['DATABASE_SSL_CA']?.trim();
+  if (inline) return inline.replace(/\\n/g, '\n');
+  const file = env['DATABASE_SSL_CA_FILE']?.trim();
+  if (!file) {
+    throw new DbConfigError(
+      `La base ${host} es remota: indique su certificado con DATABASE_SSL_CA_FILE (ruta al .crt) o DATABASE_SSL_CA (contenido PEM).`,
+    );
+  }
+  try {
+    return readFileSync(file, 'utf8');
+  } catch {
+    throw new DbConfigError(`No se pudo leer el certificado indicado en DATABASE_SSL_CA_FILE.`);
+  }
+}
+
 export function loadDbConfig(target: DbTarget, env: NodeJS.ProcessEnv = process.env): DbConfig {
-  const connectionString = env['DATABASE_URL']?.trim();
+  const urlVar = target === 'supabase' ? 'SUPABASE_DATABASE_URL' : 'DATABASE_URL';
+  const connectionString = env[urlVar]?.trim();
   if (!connectionString) {
-    throw new DbConfigError('Falta DATABASE_URL. Copie .env.example como .env y complete los valores.');
+    throw new DbConfigError(`Falta ${urlVar}. Copie .env.example como .env y complete los valores.`);
   }
   if (connectionString.includes(PLACEHOLDER_PASSWORD)) {
-    throw new DbConfigError('DATABASE_URL todavía contiene la contraseña de ejemplo de .env.example.');
+    throw new DbConfigError(`${urlVar} todavía contiene la contraseña de ejemplo de .env.example.`);
   }
   // Valida el formato sin exponer el valor.
-  summarizeConnection(connectionString);
+  const { host } = summarizeConnection(connectionString);
+  const sslCa = readSslCa(env, host);
+  if (target === 'supabase') return { target, connectionString, schema: DEFAULT_SCHEMAS.supabase, sslCa };
 
   const devSchema = readSchema(env['DATABASE_SCHEMA'], 'dev');
   const testSchema = readSchema(env['TEST_DATABASE_SCHEMA'], 'test');
@@ -62,7 +97,7 @@ export function loadDbConfig(target: DbTarget, env: NodeJS.ProcessEnv = process.
     throw new DbConfigError('DATABASE_SCHEMA no puede terminar en "_test".');
   }
 
-  return { target, connectionString, schema: target === 'test' ? testSchema : devSchema };
+  return { target, connectionString, schema: target === 'test' ? testSchema : devSchema, sslCa };
 }
 
 /** Datos de conexión aptos para mostrar en consola (sin contraseña). */

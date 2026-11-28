@@ -6,7 +6,7 @@ import { audit, authorize } from '@/server/auth';
 import { db } from '@/server/db';
 import { toUserMessage } from '@/server/errors';
 import { isSameOrigin, jsonError, UUID } from '@/server/http';
-import { uploadEvidence } from '@/server/services/evidence-upload';
+import { registerStoredEvidence, uploadEvidence } from '@/server/services/evidence-upload';
 import { fileStorage, maxEvidenceBytes } from '@/server/storage';
 
 /** Margen para las cabeceras multipart y la descripción sobre el tamaño del archivo. */
@@ -26,13 +26,47 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const tooLarge = () => jsonError(413, IMAGE_ERROR_MESSAGES.too_large(maxBytes));
   const length = Number(request.headers.get('content-length'));
   if (Number.isFinite(length) && length > maxBytes + MULTIPART_OVERHEAD) return tooLarge();
-  if (!request.headers.get('content-type')?.startsWith('multipart/form-data')) {
+  const contentType = request.headers.get('content-type') ?? '';
+  const direct = contentType.startsWith('application/json');
+  if (!direct && !contentType.startsWith('multipart/form-data')) {
     return jsonError(400, 'Envía la fotografía como formulario.');
   }
 
   try {
     const projectId = await getItemProjectId(db(), id);
     if (!projectId) return jsonError(404, 'Ítem no encontrado.');
+
+    const deps = {
+      storage: fileStorage(),
+      maxBytes,
+      findByHash: (itemId: string, sha256: string) => findEvidenceByHash(db(), itemId, sha256),
+      create: (input: Parameters<typeof createEvidence>[1]) =>
+        withTransaction(db(), async (tx) => {
+          const evidenceId = await createEvidence(tx, input);
+          await audit(tx, auth.user, 'evidence.upload', 'item_evidences', evidenceId, { itemId: id, filename: input.originalFilename });
+          return evidenceId;
+        }),
+      isUniqueViolation: (error: unknown) => getPgErrorCode(error) === PgErrorCode.uniqueViolation,
+    };
+    const respond = (result: Awaited<ReturnType<typeof uploadEvidence>>) => {
+      if (!result.ok) {
+        const status = result.code === 'too_large' ? 413 : result.code === 'duplicate' ? 409 : result.code === 'invalid_key' ? 403 : 400;
+        return jsonError(status, result.message);
+      }
+      revalidatePath('/operacion', 'layout');
+      return Response.json({ ok: true, evidenceId: result.evidenceId, filename: result.filename }, { status: 201, headers: { 'Cache-Control': 'no-store' } });
+    };
+
+    // Fotografía que el navegador ya subió directo al almacenamiento (subida firmada).
+    if (direct) {
+      const body = (await request.json().catch(() => null)) as { key?: unknown; filename?: unknown; descripcion?: unknown } | null;
+      if (!body || typeof body.key !== 'string' || typeof body.filename !== 'string') return jsonError(400, 'Datos de la fotografía incompletos.');
+      const description = textOrNull(typeof body.descripcion === 'string' ? body.descripcion : null);
+      if (description !== null && description.length > MAX_DESCRIPTION) return jsonError(400, `Descripción: máximo ${MAX_DESCRIPTION} caracteres.`);
+      return respond(
+        await registerStoredEvidence(deps, { projectId, itemId: id, key: body.key, name: body.filename, description, uploadedBy: auth.user.id }),
+      );
+    }
 
     let form: FormData;
     try {
@@ -48,34 +82,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return jsonError(400, `Descripción: máximo ${MAX_DESCRIPTION} caracteres.`);
     }
 
-    const result = await uploadEvidence(
-      {
-        storage: fileStorage(),
-        maxBytes,
-        findByHash: (itemId, sha256) => findEvidenceByHash(db(), itemId, sha256),
-        create: (input) =>
-          withTransaction(db(), async (tx) => {
-            const evidenceId = await createEvidence(tx, input);
-            await audit(tx, auth.user, 'evidence.upload', 'item_evidences', evidenceId, { itemId: id, filename: input.originalFilename });
-            return evidenceId;
-          }),
-        isUniqueViolation: (error) => getPgErrorCode(error) === PgErrorCode.uniqueViolation,
-      },
-      {
+    return respond(
+      await uploadEvidence(deps, {
         projectId,
         itemId: id,
         name: file.name,
         bytes: new Uint8Array(await file.arrayBuffer()),
         description,
         uploadedBy: auth.user.id,
-      },
-    );
-    if (!result.ok) return jsonError(result.code === 'too_large' ? 413 : result.code === 'duplicate' ? 409 : 400, result.message);
-
-    revalidatePath('/operacion', 'layout');
-    return Response.json(
-      { ok: true, evidenceId: result.evidenceId, filename: result.filename },
-      { status: 201, headers: { 'Cache-Control': 'no-store' } },
+      }),
     );
   } catch (error) {
     // La base solo admite fotografías sobre ítems de una matriz confirmada.

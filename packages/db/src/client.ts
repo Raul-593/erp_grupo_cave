@@ -23,9 +23,11 @@ const typeParsers: pg.CustomTypesConfig = {
  */
 export function createPool(config: DbConfig, overrides: pg.PoolConfig = {}): pg.Pool {
   return new pg.Pool({
-    connectionString: config.connectionString,
+    connectionString: config.sslCa ? config.connectionString.replace(/([?&])sslmode=[^&]*&?/g, '$1').replace(/[?&]$/, '') : config.connectionString,
     // El nombre del esquema ya fue validado en loadDbConfig (solo [a-z0-9_]).
     options: `-c search_path=${config.schema}`,
+    // Base remota: TLS verificado con la CA indicada (sin certificado, loadDbConfig ya rechazó).
+    ...(config.sslCa ? { ssl: { ca: config.sslCa, rejectUnauthorized: true } } : {}),
     application_name: 'erp_v1',
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,

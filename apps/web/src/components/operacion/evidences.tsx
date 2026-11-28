@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { formatBytes } from '@/lib/format';
 import { checkImageSize, IMAGE_ACCEPT, IMAGE_ERROR_MESSAGES } from '@/lib/image';
-import { removeEvidence } from '@/server/actions/evidences';
+import { prepareEvidenceUpload, removeEvidence } from '@/server/actions/evidences';
 import { InlineError, useInlineSave } from './inline';
 
 /** Fotografía elegida que todavía no se ha guardado en el servidor. */
@@ -90,10 +90,7 @@ export function EvidenceUploader({ itemId, maxBytes }: { itemId: string; maxByte
     for (const entry of queue) {
       patch(entry.key, { status: 'uploading', message: undefined });
       try {
-        const body = new FormData();
-        body.append('foto', entry.file);
-        body.append('descripcion', description);
-        const response = await fetch(`/api/items/${itemId}/evidencias`, { method: 'POST', body });
+        const response = await sendPhoto(itemId, entry.file, description);
         const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
         if (response.status === 201 && payload.ok) saved.push(entry.key);
         else patch(entry.key, { status: 'error', message: payload.error ?? 'No se pudo guardar la fotografía.' });
@@ -232,6 +229,33 @@ export function EvidenceUploader({ itemId, maxBytes }: { itemId: string; maxByte
       ) : null}
     </div>
   );
+}
+
+/**
+ * Envía una fotografía. Si el servidor ofrece subida directa (almacenamiento remoto), el archivo
+ * va del celular a Supabase Storage con un permiso de un solo uso y después se registra; si no,
+ * se envía al servidor como formulario.
+ */
+async function sendPhoto(itemId: string, file: File, description: string): Promise<Response> {
+  const target = await prepareEvidenceUpload({ itemId, size: file.size, type: file.type });
+  if (!target.ok) return Response.json({ ok: false, error: target.message }, { status: 400 });
+  if (target.mode === 'direct') {
+    const uploaded = await fetch(target.url, {
+      method: 'PUT',
+      body: file,
+      headers: { 'content-type': file.type || 'application/octet-stream', 'x-upsert': 'false' },
+    });
+    if (!uploaded.ok) return Response.json({ ok: false, error: 'No se pudo subir la fotografía al almacenamiento.' }, { status: 502 });
+    return fetch(`/api/items/${itemId}/evidencias`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ key: target.key, filename: file.name, descripcion: description }),
+    });
+  }
+  const body = new FormData();
+  body.append('foto', file);
+  body.append('descripcion', description);
+  return fetch(`/api/items/${itemId}/evidencias`, { method: 'POST', body });
 }
 
 /** Botón que elimina una fotografía tras confirmar. */

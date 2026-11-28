@@ -3,7 +3,7 @@ import { authorize } from '@/server/auth';
 import { db } from '@/server/db';
 import { toUserMessage } from '@/server/errors';
 import { contentDisposition, jsonError, UUID } from '@/server/http';
-import { fileStorage } from '@/server/storage';
+import { fileStorage, SIGNED_URL_SECONDS } from '@/server/storage';
 
 /** Muestra el PDF original de un TDR a quien puede ver los documentos (sin enlaces públicos). */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
@@ -15,6 +15,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const document = await getDocumentFile(db(), id);
     const storage = fileStorage();
     if (!document || document.storageProvider !== storage.provider) return jsonError(404, 'Documento no encontrado.');
+    // Almacenamiento remoto: enlace temporal, sin que el archivo pase por este servidor.
+    if (storage.signedReadUrl) {
+      try {
+        const url = await storage.signedReadUrl(document.storageKey, SIGNED_URL_SECONDS);
+        return new Response(null, { status: 302, headers: { Location: url, 'Cache-Control': 'private, no-store' } });
+      } catch {
+        console.error('[erp] No se pudo crear el enlace temporal', { id: document.id });
+        return jsonError(404, 'El archivo no está disponible.');
+      }
+    }
     let bytes: Buffer;
     try {
       bytes = await storage.read(document.storageKey);

@@ -14,7 +14,10 @@
     "db:status": "node --env-file=../../.env scripts/migrate.ts --status",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "db:users:example": "node --env-file=../../.env scripts/example-users.ts"
+    "db:users:example": "node --env-file=../../.env scripts/example-users.ts",
+    "db:migrate:supabase": "node --env-file=../../.env scripts/migrate.ts --target=supabase",
+    "db:status:supabase": "node --env-file=../../.env scripts/migrate.ts --status --target=supabase",
+    "db:supabase:setup": "node --env-file=../../.env scripts/supabase-setup.ts"
   },
   "dependencies": {
     "node-pg-migrate": "^9.0.0",

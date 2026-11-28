@@ -13,6 +13,8 @@ export interface AppUser {
   supplierName: string | null;
   active: boolean;
   lastLoginAt: Date | null;
+  /** Id del usuario en Supabase Auth; null en desarrollo local. */
+  authSubject: string | null;
   version: number;
 }
 
@@ -37,7 +39,7 @@ const EDITABLE_COLUMNS: Readonly<Record<keyof AppUserInput, string>> = {
 
 const SELECT = `
   SELECT u.id, u.full_name AS "fullName", u.email, u.role, u.worker_id AS "workerId", w.full_name AS "workerName",
-         u.supplier_id AS "supplierId", s.name AS "supplierName", u.active, u.last_login_at AS "lastLoginAt", u.version
+         u.supplier_id AS "supplierId", s.name AS "supplierName", u.active, u.last_login_at AS "lastLoginAt", u.auth_subject AS "authSubject", u.version
     FROM app_users u
     LEFT JOIN workers w ON w.id = u.worker_id
     LEFT JOIN suppliers s ON s.id = u.supplier_id`;
@@ -89,4 +91,16 @@ export async function updateUser(
 /** Anota el último inicio de sesión (como todo UPDATE, sube la versión del usuario). */
 export async function recordLogin(db: Queryable, id: string): Promise<void> {
   await db.query(`UPDATE app_users SET last_login_at = now() WHERE id = $1 AND active`, [id]);
+}
+
+/** Usuario vinculado a una identidad de Supabase Auth. */
+export async function getUserByAuthSubject(db: Queryable, authSubject: string): Promise<AppUser | null> {
+  const { rows } = await db.query<AppUser>(`${SELECT} WHERE u.auth_subject = $1`, [authSubject]);
+  return rows[0] ?? null;
+}
+
+/** Vincula (o desvincula con null) la identidad de Supabase Auth de un usuario. */
+export async function setUserAuthSubject(db: Queryable, id: string, authSubject: string | null): Promise<void> {
+  const { rowCount } = await db.query(`UPDATE app_users SET auth_subject = $2 WHERE id = $1`, [id, authSubject]);
+  if (rowCount !== 1) throw new VersionConflictError('app_users', id);
 }

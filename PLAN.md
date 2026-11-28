@@ -7,7 +7,7 @@
 | Proyecto «Graduaciones UNEMI» con tres eventos | **Completado en local (2026-11-27)**; pendiente la revisión del usuario (decisiones G-1…G-8). Resultado abajo |
 | Adaptador de IA (etapa C, subfase 1.3) | **Pendiente:** falta que el usuario elija proveedor y tenga clave de API |
 | Etapa D (subfase 1.4): matriz editable y confirmación | **Completado (2026-11-27)**; pendiente la revisión del usuario. Resultado abajo; retirar tras la revisión |
-| Subida a Supabase (parte S) | **Pospuesta por el usuario (2026-11-27)** hasta tener todo listo para las primeras pruebas. El proyecto de Supabase ya existe, vacío y sin conectar |
+| Subida a Supabase y uso desde celulares (parte S) | **En progreso.** Aprobado el 2026-11-27 con las recomendaciones S-D1…S-D8 (sin cargar usuarios: los crea el usuario). Hechos S0–S6; faltan primer superusuario (usuario), publicación (S7) y respaldos (S8) |
 
 ### Camino a las primeras pruebas (orden acordado, 2026-11-27)
 
@@ -99,54 +99,60 @@ Aprobada el 2026-11-27 con las recomendaciones de D-1…D-10. Pendiente la revis
 
 ---
 
-## Tarea pospuesta: subida a Supabase (parte S)
+## Tarea propuesta: subida a Supabase y uso desde celulares (parte S)
 
 | Campo | Valor |
 | --- | --- |
-| Estado | **Propuesto y pospuesto (2026-11-27):** se hará cuando esté todo listo para las primeras pruebas (punto 5 del camino). Nada se ejecuta sin aprobación explícita |
-| Fuera de alcance | Publicar la aplicación web (S-D8), portal del proveedor, módulo de aprobación de costos, políticas RLS por usuario (S-D7) |
+| Estado | **Aprobado el 2026-11-27** con las recomendaciones S-D1…S-D8. El usuario crea los usuarios a mano: no se cargan trabajadores ni usuarios. **En progreso:** S0–S6 hechos |
+| Objetivo | Base, fotografías e inicio de sesión en Supabase; aplicación publicada en una dirección de internet para que los encargados suban fotos desde el celular |
+| Fuera de alcance | IA, portal del proveedor, aprobación de costos, políticas RLS por usuario (S-D7, «después»), informe fotográfico |
 
-### S1. Objetivo
+### S1. Comprobación de solo lectura (hecha el 2026-11-27)
 
-La base de datos, los archivos (PDF y fotografías) y el inicio de sesión pasan a Supabase: primero en un proyecto de pruebas y, validado, en el de producción. Con la base en Supabase la aplicación sigue corriendo solo en este computador hasta publicarla (S-D8).
+- Proyecto `pwgnnqynbfppcmtekizi`; conexión por **Session pooler** `aws-2-us-east-1.pooler.supabase.com:5432` (la conexión directa es solo IPv6 y este equipo no la resuelve). Región: `us-east-1`.
+- **PostgreSQL 17.12** (local: 18.4). Las migraciones `0001`–`0011` no usan nada exclusivo de PG 18 (revisado); se confirma al aplicarlas.
+- Usuario `postgres`: puede crear esquemas y roles, no es superusuario. `pgcrypto`, `uuid-ossp` y `gen_random_uuid()` disponibles. El pooler respeta `search_path` por sesión (el pool actual funciona sin cambios).
+- Proyecto vacío: sin esquema `erp`, 0 tablas en `public`, sin buckets. La clave secreta de Storage funciona.
+- **SSL:** el certificado lo firma la CA de Supabase, que Node no conoce. Para conexión verificada hace falta el certificado de Supabase (Project Settings › Database › SSL Configuration › Download certificate) guardado fuera de Git; no se conectará sin verificar en el uso normal.
 
-### S2. Punto de partida (2026-11-27)
-
-- Migraciones `0001`–`0009` (PostgreSQL 18.4 local; Supabase usa una versión anterior: comprobar en S1).
-- `app_users.auth_subject` vacía, prevista para el id de Supabase Auth; historial en `audit_log`.
-- Autenticación detrás de `AuthProvider`; solo existe el adaptador `dev`, que se niega a funcionar con una base remota. `AUTH_PROVIDER=supabase` se rechaza hasta que exista su adaptador.
-- Almacenamiento detrás de `FileStorage` (`'local' | 'supabase'`); solo existe el adaptador local.
-- El esquema `erp` no está en `public`. El pool fija el esquema con `options: -c search_path=…`, que el pooler de Supabase puede ignorar: se fijará en el rol.
-- Conexión prevista: cadena del **Session pooler** en `.env` como `SUPABASE_DATABASE_URL`, sin reemplazar `DATABASE_URL`.
-
-### S3. Decisiones que necesito (con recomendación)
+### S2. Decisiones que necesito (con recomendación)
 
 | ID | Decisión | Recomendación | Alternativa |
 | --- | --- | --- | --- |
-| S-D1 | Plan de Supabase | **Pro** para datos reales (el gratuito pausa tras una semana sin uso y no tiene respaldos diarios); costo y cuenta los gestiona el usuario | Gratuito solo para pruebas |
-| S-D2 | Entornos | **Dos proyectos:** pruebas primero y producción después de validar | Uno solo |
-| S-D3 | Región | **La del futuro servidor web**; si no está decidida, `us-east-1`. Verificar con la empresa la Ley Orgánica de Protección de Datos Personales | `sa-east-1` |
-| S-D4 | Qué datos se suben | **Producción limpia:** esquema, empresa, catálogos elegidos y usuarios reales; sin demostración, usuarios de ejemplo ni proyectos de prueba | Copiar todo al proyecto de pruebas |
-| S-D5 | Archivos | **Buckets privados** `tdr` y `evidencias`; los archivos pasan por el servidor | URLs firmadas de corta duración |
-| S-D6 | Acceso de las personas | **Invitación por correo** (requiere SMTP propio) | Contraseña temporal |
-| S-D7 | RLS | **Ahora:** RLS en todas las tablas sin acceso para `anon` ni `authenticated` y rol `erp_app` solo de datos. **Después:** políticas por usuario | Políticas por usuario desde ya |
-| S-D8 | Publicar la web | **Plan aparte** | Incluirlo aquí |
+| S-D1 | Plan de Supabase | **Pro** para datos reales (el gratuito pausa tras una semana sin uso y no tiene respaldos diarios). Lo contrata el usuario | Gratuito por ahora, con respaldo manual diario |
+| S-D2 | Entornos | **Este proyecto es producción.** Antes de tocarlo, las migraciones se ensayan dentro de una transacción que se revierte (no deja rastro) | Crear un segundo proyecto de pruebas |
+| S-D4 | Qué datos se suben | **Graduaciones UNEMI** (contratante, empresa Grupo CAVE, eventos, 593 ítems, 16 proveedores) más trabajadores y usuarios reales. Sin demostración, proyectos de prueba ni usuarios de ejemplo | Copiar todo |
+| S-D5 | Archivos | **Buckets privados** `tdr` y `evidencias`. Las fotos **suben directo del celular a Storage** con una URL firmada de un solo uso que emite el servidor tras `authorize`; el servidor valida el archivo y registra la foto | Que pasen por el servidor (choca con el límite de tamaño de las funciones del hosting) |
+| S-D6 | Acceso de las personas | **Contraseña temporal** creada por el superusuario en Administración › Usuarios; la persona la cambia al entrar | Invitación por correo (requiere SMTP propio) |
+| S-D7 | Seguridad en la base | El esquema `erp` **no se expone** en la API de Supabase; RLS activado en todas sus tablas sin políticas para `anon`/`authenticated`; la aplicación entra con un rol propio `erp_app` (solo datos, sin crear tablas) | Entrar con `postgres` |
+| S-D8 | Publicar la web | **Netlify** (hosting que ya tienen), dominio o subdominio de la empresa, HTTPS. Se verifica antes el soporte de Next.js 16 y sus límites | Otro hosting (Vercel, Render) |
 
-### S4. Pasos
+### S3. Pasos
 
 | # | Paso | Verificación |
 | --- | --- | --- |
-| S0 | Aprobación, dependencias (`@supabase/supabase-js`, `@supabase/ssr`) y respuestas S-D1…S-D8 | Aprobación explícita |
-| S1 | Comprobar versión, extensiones, SSL y conexión (solo lectura) | Informe de compatibilidad |
-| S2 | Esquema `erp`, rol `erp_app` y migraciones | `pnpm db:status` contra Supabase |
-| S3 | Migración de RLS (solo `erp_app`) | `anon`/`authenticated` no leen nada; Security Advisor sin alertas críticas |
-| S4 | Adaptador de almacenamiento `supabase` | Pruebas con mock y una real |
-| S5 | Adaptador de autenticación `supabase` (correo y contraseña, recuperación, invitación, `auth_subject`) | Un usuario por rol |
-| S6 | Validación completa con la aplicación local apuntando a Supabase | Pruebas por rol en verde |
-| S7 | Producción y carga de catálogos y usuarios reales (script que respeta triggers; no `pg_dump` completo) | Conteos e ingreso de cada usuario |
-| S8 | Respaldos de base y de archivos; plan de reversión | Documento |
-| S9 | Actualizar `.env.example`, `AGENTS.md`, `PLAN.md` y `MEMORY.md` | Sin secretos |
+| S0 | Aprobación, respuestas S-D1…S-D8 y dependencias `@supabase/supabase-js` y `@supabase/ssr` | Aprobación explícita |
+| S2 | Ensayo de `0001`–`0011` en una transacción revertida; luego esquema `erp`, migraciones y rol `erp_app` | `pnpm db:status` contra Supabase |
+| S3 | Migración `0012`: RLS en todas las tablas de `erp`, permisos de `erp_app` | `anon`/`authenticated` no leen nada; Security Advisor sin alertas críticas |
+| S4 | Adaptador de almacenamiento `supabase` y subida directa firmada | Pruebas con mock y una foto real |
+| S5 | Adaptador de autenticación `supabase` (correo y contraseña, cambio de contraseña, `auth_subject`) y alta de usuarios con contraseña temporal | Un usuario por tipo |
+| S6 | Carga de datos: empresa, Graduaciones UNEMI (`pnpm db:import:matrix` apuntando a Supabase), trabajadores y usuarios reales | Conteos y totales iguales al Excel |
+| S7 | Publicación en Netlify con secretos en sus variables de entorno | Ingreso y subida de una foto **desde un celular real** |
+| S8 | Respaldos de base y de fotos; plan de reversión; `.env.example`, `AGENTS.md`, `MEMORY.md` | Documento y una restauración de prueba |
 
-### S5. Riesgos
+### Resultado parcial (2026-11-27)
 
-Diferencia de versión de PostgreSQL; pooler sin ajustes de sesión; invitaciones sin SMTP propio; carga de pagos con triggers (repartos después de las líneas); privacidad y región; costos mensuales.
+- **Código:** destino `supabase` en `@erp/db` (`SUPABASE_DATABASE_URL`, esquema `erp`); conexión remota solo con CA (`DATABASE_SSL_CA_FILE` o `DATABASE_SSL_CA`). Migración `0012_rls_erp_app` (RLS en todas las tablas y política para `erp_app`; aplicada también en `erp` y `erp_test`, respaldo `dumps/erp_antes_0012_2026-11-27.dump`). Scripts `db:supabase:setup` (`--rehearse`, `--role`, `--grants`), `db:migrate:supabase`, `db:status:supabase`, `db:supabase:storage`, `db:supabase:admin`, `db:import:matrix --target=supabase` y `start:supabase`. Adaptador de almacenamiento `supabase` (buckets privados `tdr` y `evidencias`, enlaces de lectura de 5 min, subida directa firmada desde el celular que el servidor valida y registra). Adaptador de ingreso `supabase` (correo y contraseña, `src/proxy.ts` renueva la sesión, cambio obligatorio de la contraseña temporal en `/cuenta/contrasena`). Administración › Usuarios pide correo y contraseña temporal y crea la cuenta en Supabase Auth (con compensación si falla). Dependencias: `@supabase/supabase-js` 2.119.2 y `@supabase/ssr` 0.12.7.
+- **En Supabase:** ensayo correcto de `0001`–`0012` en PG 17.12 (revertido); rol `erp_app` (sin privilegios de administración; su conexión en `.env.supabase`, fuera de Git); esquema `erp` con 24 tablas, RLS en todas; buckets privados con límite de tamaño y tipo. Datos: Graduaciones UNEMI (contratante EP UNEMI, empresa Grupo CAVE, 3 eventos, 593 ítems, 16 proveedores) con los mismos totales que el Excel; sin trabajadores ni usuarios.
+- **Verificado:** `erp_app` entra verificado por el pooler, escribe (revertido) y no puede crear tablas, borrar el historial ni leer las migraciones; la API pública con la clave publicable no lee `erp` ni lista archivos; subida firmada sin clave aceptada una sola vez, PDF rechazado en `evidencias`, lectura por enlace temporal; la aplicación local contra Supabase muestra el ingreso con correo y rechaza credenciales incorrectas. Tipos, lint, 115 pruebas de base y 160 de web, build.
+- **Sin probar:** ingreso correcto, cambio de contraseña, alta de usuarios y subida de una foto desde la aplicación contra Supabase (no hay usuarios: los crea el usuario) y un celular real (falta publicar).
+- **Pendiente:** primer superusuario (el usuario: Supabase › Authentication › Add user y `pnpm db:supabase:admin`); S7 publicación (hosting y dominio); S8 respaldos. La subida de PDF de TDR pasa por el servidor y en Netlify chocaría con su límite de tamaño (no urgente: sin IA no se cargan TDR).
+
+### S4. Riesgos
+
+- Es producción desde el primer día: todo cambio va por migración y con respaldo previo.
+- Diferencia PG 17 / 18 (bajo riesgo, se confirma en el ensayo).
+- Límites del hosting para subir fotos grandes (por eso la subida directa firmada).
+- Cobertura móvil en las sedes: sin conexión no se pueden subir fotos (la operación sin conexión es la Fase 8).
+- Costos mensuales de Supabase y del hosting; privacidad y región (`us-east-1`).
+- Mientras no exista S5, el ingreso `dev` se niega a funcionar con esta base (correcto).
