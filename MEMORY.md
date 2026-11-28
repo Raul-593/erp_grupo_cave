@@ -35,7 +35,7 @@
 - `.gitignore`: usar `/storage/`. Tablas de `0007` solo aceptan ítems de una matriz confirmada del mismo proyecto.
 - Scripts de Node: importaciones relativas con `.ts`, sin alias `@/` (también desde la carpeta temporal con ruta relativa al repo).
 - `pg` devuelve `date` y `numeric` como texto: sumar en SQL o con `lib/money.ts`, nunca con coma flotante.
-- `apps/web` fija TS 6.0.3 y ESLint 9.39.5. En Windows, pnpm: `--config.child-concurrency=1` si falla al renombrar.
+- `apps/web` fija TS 6.0.3 y ESLint 9.39.5. En Windows, pnpm: `--config.child-concurrency=1` si falla al renombrar. Netlify: `NODE_VERSION` ≥ 24.22 (el corepack 0.34 de Node 24.11 no arranca pnpm 11+); el comando usa `corepack pnpm install` antes de compilar (la compilación de la CLI no instala ni trae pnpm); `publish = "apps/web/.next"` (relativo a la raíz) y `COREPACK_HOME` propio (la caché compartida guarda una entrada de pnpm 12 rota que apunta a `bin/pnpm.cjs`).
 - Componentes `'use client'`: solo **tipos** de `@erp/db` (un valor arrastra `pg` al navegador).
 - Toda acción o ruta nueva: `authorize(...)` y `audit(tx, ...)` en la misma transacción (`server/access-coverage.test.ts`). Mover filas intercambia `item_number`: siempre dentro de `withTransaction` (unicidad diferida).
 - Probar en `web-verificacion` (puerto 3100, tras `pnpm build`). Campos de texto: escritura real; `window.confirm` se sustituye por JS. Las acciones se pueden llamar directo con el encabezado `Next-Action` (id en los scripts de la página) para probar rechazos del servidor.
