@@ -6,12 +6,9 @@ const WORKER = '6f1c2a34-9b7d-4e21-8c3f-0a1b2c3d4e5f';
 const SUPPLIER = '1a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d';
 
 describe('formulario de usuario', () => {
-  it('exige trabajador al empleado de campo y proveedor al proveedor', () => {
-    const field = userFormSchema.safeParse({ fullName: 'Campo', role: 'field', workerId: '', supplierId: '' });
-    expect(field.success).toBe(false);
-    expect(field.error?.issues[0]?.path).toEqual(['workerId']);
-    const supplier = userFormSchema.safeParse({ fullName: 'Prov', role: 'supplier', workerId: '', supplierId: '' });
-    expect(supplier.error?.issues[0]?.path).toEqual(['supplierId']);
+  it('acepta el alta sin vínculo: la base crea el trabajador o el proveedor (0013)', () => {
+    expect(userFormSchema.parse({ fullName: 'Campo', role: 'field', workerId: '', supplierId: '' })).toMatchObject({ workerId: null, supplierId: null });
+    expect(userFormSchema.parse({ fullName: 'Prov', role: 'supplier', workerId: '', supplierId: '' })).toMatchObject({ workerId: null, supplierId: null });
   });
 
   it('vacía el vínculo que no corresponde al rol y normaliza el correo', () => {
@@ -45,15 +42,15 @@ describe('navegación por rol', () => {
       'Planificación',
       'Abastecimiento',
       'Ejecución',
-      'Trabajadores',
-      'Proveedores',
     ]);
+    expect(labels(adminTabs('admin'))).toEqual(['Usuarios', 'Trabajadores', 'Proveedores']);
     expect(labels(navModules('admin'))).toEqual(['Operación', 'Administración']);
   });
 
   it('campo no ve Abastecimiento ni catálogos; contabilidad no ve Administración', () => {
     expect(labels(operationTabs('field'))).toEqual(['Proyectos', 'Requerimiento', 'Planificación', 'Ejecución']);
     expect(labels(operationTabs('accounting'))).toContain('Abastecimiento');
+    expect(labels(operationTabs('accounting'))).not.toContain('Trabajadores');
     expect(adminTabs('accounting')).toEqual([]);
     expect(labels(navModules('accounting'))).toEqual(['Operación']);
   });

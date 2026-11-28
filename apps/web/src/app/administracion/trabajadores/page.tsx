@@ -24,7 +24,7 @@ export default async function TrabajadoresPage() {
         subtitle="Las personas que pueden ser responsables de un ítem de la matriz. Solo los activos aparecen en la lista desplegable."
         actions={
           canWrite ? (
-            <Link href="/operacion/trabajadores/nuevo" className="btn btn-p">
+            <Link href="/administracion/trabajadores/nuevo" className="btn btn-p">
               + Nuevo trabajador
             </Link>
           ) : undefined
@@ -67,7 +67,7 @@ export default async function TrabajadoresPage() {
                     <td>
                       {canWrite ? (
                         <div className="flex justify-end gap-[7px]">
-                          <Link href={`/operacion/trabajadores/${worker.id}/editar`} className="btn">
+                          <Link href={`/administracion/trabajadores/${worker.id}/editar`} className="btn">
                             Editar
                           </Link>
                           <form action={setWorkerActive}>

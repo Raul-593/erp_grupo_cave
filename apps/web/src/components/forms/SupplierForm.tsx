@@ -53,7 +53,7 @@ export function SupplierForm({ initial }: { initial?: Record<string, string> }) 
         <button type="submit" className="btn btn-p" disabled={pending}>
           {pending ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear proveedor'}
         </button>
-        <Link href="/operacion/proveedores" className="btn">
+        <Link href="/administracion/proveedores" className="btn">
           Cancelar
         </Link>
         <FormMessage status={state.status} message={state.message} />

@@ -22,19 +22,24 @@ const OPERATION_TABS: readonly (NavLink & { permission: Permission })[] = [
   { href: '/operacion/planificacion', label: 'Planificación', permission: 'matrix.read' },
   { href: '/operacion/abastecimiento', label: 'Abastecimiento', permission: 'procurement.read' },
   { href: '/operacion/ejecucion', label: 'Ejecución', permission: 'schedule.read' },
-  { href: '/operacion/trabajadores', label: 'Trabajadores', permission: 'catalogs.read' },
-  { href: '/operacion/proveedores', label: 'Proveedores', permission: 'catalogs.read' },
 ];
 
 const ADMIN_TABS: readonly (NavLink & { permission: Permission })[] = [
   { href: '/administracion/usuarios', label: 'Usuarios', permission: 'users.manage' },
+  { href: '/administracion/trabajadores', label: 'Trabajadores', permission: 'catalogs.read' },
+  { href: '/administracion/proveedores', label: 'Proveedores', permission: 'catalogs.read' },
 ];
 
 export function operationTabs(role: UserRole): NavLink[] {
   return OPERATION_TABS.filter((tab) => can(role, tab.permission)).map(({ href, label }) => ({ href, label }));
 }
 
+/**
+ * Administración solo la abre el superusuario (`users.manage`, como exige su layout). Contabilidad
+ * tiene `catalogs.read`, pero aún no entra a Administración (decisión del usuario, 2026-11-28).
+ */
 export function adminTabs(role: UserRole): NavLink[] {
+  if (!can(role, 'users.manage')) return [];
   return ADMIN_TABS.filter((tab) => can(role, tab.permission)).map(({ href, label }) => ({ href, label }));
 }
 

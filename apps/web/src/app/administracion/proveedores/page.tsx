@@ -25,7 +25,7 @@ export default async function ProveedoresPage() {
         subtitle="Las empresas y personas a las que se adjudica un ítem en Planificación. Solo los activos aparecen en la lista desplegable."
         actions={
           canWrite ? (
-            <Link href="/operacion/proveedores/nuevo" className="btn btn-p">
+            <Link href="/administracion/proveedores/nuevo" className="btn btn-p">
               + Nuevo proveedor
             </Link>
           ) : undefined
@@ -72,7 +72,7 @@ export default async function ProveedoresPage() {
                     <td>
                       {canWrite ? (
                         <div className="flex justify-end gap-[7px]">
-                          <Link href={`/operacion/proveedores/${supplier.id}/editar`} className="btn">
+                          <Link href={`/administracion/proveedores/${supplier.id}/editar`} className="btn">
                             Editar
                           </Link>
                           <form action={setSupplierActive}>

@@ -46,6 +46,15 @@ export async function saveUser(_prev: ActionState, formData: FormData): Promise<
     if (Object.keys(errors).length > 0) return { status: 'error', message: 'Revisa los campos marcados.', fieldErrors: errors, values };
   }
 
+  // El trigger de alta (0013) crea el trabajador o proveedor solo al crear; al editar, el rol
+  // de campo y el de proveedor necesitan uno elegido.
+  if (id && data.role === 'field' && data.workerId === null) {
+    return { status: 'error', message: 'Revisa los campos marcados.', fieldErrors: { workerId: ['Un empleado de campo debe estar vinculado a su trabajador.'] }, values };
+  }
+  if (id && data.role === 'supplier' && data.supplierId === null) {
+    return { status: 'error', message: 'Revisa los campos marcados.', fieldErrors: { supplierId: ['Elige el proveedor al que pertenece el usuario.'] }, values };
+  }
+
   const details = { fullName: data.fullName, email: data.email, role: data.role, workerId: data.workerId, supplierId: data.supplierId, active: data.active };
   try {
     if (id) {
@@ -74,7 +83,14 @@ export async function saveUser(_prev: ActionState, formData: FormData): Promise<
         await withTransaction(db(), async (tx) => {
           const newId = await createUser(tx, data);
           if (login) await setUserAuthSubject(tx, newId, login);
-          await audit(tx, auth.user, 'user.create', 'app_users', newId, details);
+          // Registra el trabajador o proveedor que la base creó si no se eligió uno.
+          const created = await getUser(tx, newId);
+          await audit(tx, auth.user, 'user.create', 'app_users', newId, {
+            ...details,
+            workerId: created?.workerId ?? null,
+            supplierId: created?.supplierId ?? null,
+            linkCreated: data.role === 'supplier' ? data.supplierId === null : data.workerId === null,
+          });
         });
       } catch (error) {
         // Sin usuario en la aplicación, la cuenta de ingreso quedaría huérfana.

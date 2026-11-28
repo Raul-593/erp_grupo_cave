@@ -2,8 +2,9 @@
 
 ## 1. Estado actual
 - **Proyecto «Graduaciones UNEMI» cargado en `erp` el 2026-11-27** (migración `0011` en `erp` y `erp_test`): 3 eventos (Quito, Cuenca, Guayaquil), 593 ítems desde Excel, matriz por evento, estado operativo, responsable en bloque y fotos desde celular. Espera la revisión del usuario (decisiones G-1…G-8 de PLAN.md); sin commit (último commit del usuario: `8b833e2`; la etapa D tampoco está en un commit).
+- **Parte A (2026-11-28):** Trabajadores y Proveedores en Administración (solo superusuario; contabilidad sin catálogos en pantalla por ahora); `0013` crea el trabajador/proveedor al dar de alta un usuario sin vínculo. Aplicada en `erp`/`erp_test`, falta Supabase.
 - `erp`: además, proyecto 1 «Prueba 1» (demostración) y «PRUEBA etapa D»; 18 usuarios de ejemplo. Graduaciones UNEMI aún sin responsables asignados.
-- **Supabase (parte S) en progreso:** proyecto `pwgnnqynbfppcmtekizi` (PG 17.12, pooler `aws-2-us-east-1`) con esquema `erp` (`0001`–`0012`), rol `erp_app`, RLS, buckets `tdr`/`evidencias` y Graduaciones UNEMI cargado (sin usuarios: los crea el usuario). Falta el primer superusuario, publicar y respaldos.
+- **Supabase (parte S) en progreso:** proyecto `pwgnnqynbfppcmtekizi` (PG 17.12, pooler `aws-2-us-east-1`) con esquema `erp` (`0001`–`0012`; falta `0013`), rol `erp_app`, RLS, buckets `tdr`/`evidencias` y Graduaciones UNEMI cargado (sin usuarios: los crea el usuario). Falta el primer superusuario, publicar y respaldos.
 
 ## 2. Decisiones aprobadas
 - BD local `grupo_cave_v1`, usuario `grupo_cave`, PostgreSQL 18.4; esquemas `erp` (dev) y `erp_test`. Evitar funciones exclusivas de PG 18.
@@ -20,7 +21,7 @@
 - `apps/web`: shell por rol, `server/auth.ts`, `integrations/auth/`; Requerimiento con `components/requerimiento/MatrixEditor.tsx` y `FichaProposal.tsx` (+ `StartManualButton`), `server/requerimiento-view.ts`, `lib/draft.ts`, acciones `server/actions/matrix.ts`; resto: carga de PDF, IA sin adaptador, Planificación/Abastecimiento/Ejecución, fotos, pagos, Usuarios.
 
 ## 4. Archivos relevantes
-- `packages/db/migrations/0001`–`0012` (aplicadas en local y Supabase; no editarlas). Toda tabla nueva necesita su política `erp_app_all` (o `db:supabase:setup --grants`). `packages/db/scripts/example-users.ts`.
+- `packages/db/migrations/0001`–`0013` (`0013` solo en local; no editarlas). Toda tabla nueva necesita su política `erp_app_all` (o `db:supabase:setup --grants`). `packages/db/scripts/example-users.ts`.
 - `apps/web/scripts/local/` (ignorado por Git): `demo-cave-v3.ts`, `graduaciones-unemi.json` y su conversor `xlsx-graduaciones-a-json.py` (Python sin dependencias).
 - `apps/web/src/components/operacion/events.tsx`, `event-checklist.tsx`, `bulk-assign.tsx`; `lib/events.ts`; `packages/db/src/import/cost-matrix.ts`.
 - `dumps/erp_antes_0007…` a `erp_antes_0011_2026-11-27.dump` (ignorados por Git).
@@ -28,7 +29,6 @@
 
 ## 5. Tareas y bloqueos
 - Adaptador de IA: el usuario debe elegir proveedor y tener clave; instalar su SDK con aprobación; autorizar envío de TDR reales. La importación de la propuesta solo se probó con una propuesta simulada.
-- Parte S (Supabase): pospuesta hasta tener todo listo para las primeras pruebas; proyecto creado, vacío y sin conectar.
 - Lo confirmado, la demostración y `audit_log` no se borran por medios normales.
 
 ## 6. Aprendizajes
@@ -40,7 +40,7 @@
 - Toda acción o ruta nueva: `authorize(...)` y `audit(tx, ...)` en la misma transacción (`server/access-coverage.test.ts`). Mover filas intercambia `item_number`: siempre dentro de `withTransaction` (unicidad diferida).
 - Probar en `web-verificacion` (puerto 3100, tras `pnpm build`). Campos de texto: escritura real; `window.confirm` se sustituye por JS. Las acciones se pueden llamar directo con el encabezado `Next-Action` (id en los scripts de la página) para probar rechazos del servidor.
 - Bash de esta máquina: heredocs largos con comillas fallan o los bloquea la comprobación de seguridad; escribir scripts con Write y ejecutarlos. `pg_dump` desde Bash con la URL de `.env` se queda colgado: lanzarlo desde Node con `PGPASSWORD` y `-w`.
-- Tras `pnpm build` hay que reiniciar `web-verificacion` / `web-supabase` (puerto 3200, contra Supabase). Con dos `--env-file`, Node da prioridad al último.
+- Tras mover rutas, borrar `apps/web/.next/dev/types` (tipos viejos rompen typecheck/build). Tras `pnpm build` hay que reiniciar `web-verificacion` / `web-supabase` (puerto 3200, contra Supabase). Con dos `--env-file`, Node da prioridad al último.
 - El usuario también edita datos: no «restaurar» lo que no cambié yo.
 
 ## 7. Próximos pasos

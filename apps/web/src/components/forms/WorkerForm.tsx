@@ -44,7 +44,7 @@ export function WorkerForm({ initial }: { initial?: Record<string, string> }) {
         <button type="submit" className="btn btn-p" disabled={pending}>
           {pending ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear trabajador'}
         </button>
-        <Link href="/operacion/trabajadores" className="btn">
+        <Link href="/administracion/trabajadores" className="btn">
           Cancelar
         </Link>
         <FormMessage status={state.status} message={state.message} />

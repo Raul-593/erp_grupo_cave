@@ -197,14 +197,8 @@ export const userFormSchema = z
     supplierId: optionalId('Proveedor'),
     active: field().transform((v) => v === 'on' || v === 'true'),
   })
-  .superRefine((value, ctx) => {
-    if (value.role === 'field' && value.workerId === null) {
-      ctx.addIssue({ code: 'custom', message: 'Un empleado de campo debe estar vinculado a su trabajador.', path: ['workerId'] });
-    }
-    if (value.role === 'supplier' && value.supplierId === null) {
-      ctx.addIssue({ code: 'custom', message: 'Elige el proveedor al que pertenece el usuario.', path: ['supplierId'] });
-    }
-  })
+  // Sin vínculo, el alta crea el trabajador o el proveedor con el mismo nombre (trigger de la
+  // migración 0013); al editar, la acción exige el vínculo que el rol necesita.
   .transform((value) => ({
     ...value,
     workerId: value.role === 'supplier' ? null : value.workerId,

@@ -7,6 +7,7 @@
 | Proyecto «Graduaciones UNEMI» con tres eventos | **Completado en local (2026-11-27)**; pendiente la revisión del usuario (decisiones G-1…G-8). Resultado abajo |
 | Adaptador de IA (etapa C, subfase 1.3) | **Pendiente:** falta que el usuario elija proveedor y tenga clave de API |
 | Etapa D (subfase 1.4): matriz editable y confirmación | **Completado (2026-11-27)**; pendiente la revisión del usuario. Resultado abajo; retirar tras la revisión |
+| Catálogos en Administración y alta automática de trabajador/proveedor (parte A) | **Completado en local (2026-11-28)**; `0013` aplicada en `erp` y `erp_test`, pendiente en Supabase (aprobación aparte). Resultado abajo |
 | Subida a Supabase y uso desde celulares (parte S) | **En progreso.** Aprobado el 2026-11-27 con las recomendaciones S-D1…S-D8 (sin cargar usuarios: los crea el usuario). Hechos S0–S6; faltan primer superusuario (usuario), publicación (S7) y respaldos (S8) |
 
 ### Camino a las primeras pruebas (orden acordado, 2026-11-27)
@@ -23,6 +24,40 @@ Cada punto necesita su propio plan y aprobación.
 7. **Datos reales y piloto.**
 
 Las tareas completadas (usuarios y permisos, control de campo en Ejecución, reparto de pagos, demostración y fotografías, etapas A–C de Requerimiento, subfase 1.1) se retiraron de este archivo. Sus decisiones vigentes están en `AGENTS.md`, su estado en `MEMORY.md` y su detalle en el historial de Git.
+
+---
+
+## Resultado: catálogos en Administración y alta automática (parte A, aprobada y completada el 2026-11-28)
+
+**Objetivo (pedido del usuario):** mover Trabajadores y Proveedores de Operación a Administración, junto a Usuarios, y que al crear un usuario la base cree automáticamente su trabajador o su proveedor.
+
+### Decisiones (aprobadas el 2026-11-28)
+
+- **A-D1. Qué tipos de usuario crean trabajador.** Recomendado: superusuario, campo y contabilidad (todos son personal de la empresa y pueden ser responsables); el proveedor crea un proveedor. Alternativa: solo el empleado de campo.
+- **A-D2. Cuándo crea.** Recomendado: solo si el usuario se guarda **sin** trabajador/proveedor elegido; el formulario conserva la lista con una primera opción «Crear uno nuevo con este nombre» (por omisión), para poder seguir vinculando a un trabajador o proveedor ya existente (por ejemplo, los responsables de Graduaciones UNEMI). Datos copiados: nombre (y correo en el trabajador); proveedor de tipo `external`.
+- **A-D3. Contabilidad.** Decisión del usuario: no incluirla por ahora. Administración sigue siendo solo del superusuario (`users.manage`); contabilidad conserva `catalogs.read` pero ya no ve los catálogos en pantalla (queda para después).
+- **A-D4. Solo al crear.** Recomendado: el trigger actúa solo en el alta; cambiar el nombre o desactivar el usuario no toca al trabajador/proveedor (se editan en su catálogo).
+
+### Pasos
+
+1. Mover `app/operacion/{trabajadores,proveedores}` a `app/administracion/` y actualizar enlaces (`navigation.ts`, formularios, acciones, Requerimiento). Las rutas antiguas redirigen a las nuevas.
+2. ~~Cambiar el layout de Administración~~: no se cambia (A-D3); `adminTabs` devuelve vacío sin `users.manage`.
+3. Migración `0013_alta_trabajador_proveedor.sql`: función y trigger `BEFORE INSERT ON app_users` que, si falta el vínculo, inserta el trabajador o proveedor y completa `worker_id`/`supplier_id` (los CHECK existentes se evalúan después del trigger). Sin tablas nuevas (RLS sin cambios). Down: quita trigger y función.
+4. Formulario y acción de usuario: opción «Crear uno nuevo», el `audit_log` del alta registra el trabajador/proveedor creado.
+5. Pruebas: repositorio de usuarios (alta con y sin vínculo, por tipo), navegación por rol y cobertura de `authorize`. Typecheck, lint, test y build; verificación en `web-verificacion`.
+6. Aplicar `0013` en `erp` y `erp_test` (con respaldo previo de `erp`). **En Supabase solo con aprobación aparte.**
+
+### Resultado
+
+- Páginas movidas a `apps/web/src/app/administracion/{trabajadores,proveedores}`; las rutas `/operacion/{trabajadores,proveedores}/*` redirigen (`next.config.ts`).
+- `0013_alta_trabajador_proveedor.sql`: trigger `app_users_create_link` (`BEFORE INSERT`). Respaldo previo: `dumps/erp_antes_0013_2026-11-28.dump`.
+- Formulario: «Crear un trabajador/proveedor nuevo con este nombre» por omisión en el alta; al editar, campo y proveedor siguen exigiendo vínculo. La auditoría `user.create` registra el vínculo creado (`linkCreated`).
+- Pruebas: `pnpm test` (116 + 160), typecheck, lint y build sin errores; verificado en `web-verificacion` (redirección, pestañas y opciones del formulario). El alta real desde la pantalla no se probó en `erp` para no dejar un usuario de prueba (no se borran); la base se probó en `erp_test`.
+
+### Riesgos
+
+- Un alta con vínculo vacío por error crea un trabajador duplicado; se mitiga con la opción explícita del formulario y desactivándolo después (los trabajadores no se borran).
+- `db:users:example` pasa siempre el vínculo: no cambia. `db:supabase:admin` crea el primer superusuario sin trabajador: con A-D1 recomendado también se le crearía uno (se registra en su auditoría).
 
 ---
 

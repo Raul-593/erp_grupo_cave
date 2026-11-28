@@ -16,7 +16,10 @@ export interface LinkOption {
   taken?: boolean;
 }
 
-/** Alta o edición de un usuario. El vínculo que se pide depende del tipo de usuario. */
+/**
+ * Alta o edición de un usuario. El vínculo que se pide depende del tipo de usuario. En el alta,
+ * dejarlo vacío crea el trabajador o el proveedor con el nombre del usuario (migración 0013).
+ */
 export function UserForm({
   initial,
   workers,
@@ -92,7 +95,7 @@ export function UserForm({
       {role === 'supplier' ? (
         <Field name="supplierId" label="Proveedor" errors={errors}>
           <select {...fieldProps('supplierId', values, errors)} key="supplier">
-            <option value="">Elige el proveedor…</option>
+            <option value="">{editing ? 'Elige el proveedor…' : 'Crear un proveedor nuevo con este nombre'}</option>
             {suppliers.map((supplier) => (
               <option key={supplier.id} value={supplier.id}>
                 {supplier.name}
@@ -103,12 +106,14 @@ export function UserForm({
       ) : (
         <Field
           name="workerId"
-          label={role === 'field' ? 'Trabajador' : 'Trabajador (opcional)'}
+          label={role === 'field' || !editing ? 'Trabajador' : 'Trabajador (opcional)'}
           errors={errors}
           hint={role === 'field' ? 'Verá y trabajará solo los ítems donde este trabajador es el responsable.' : undefined}
         >
           <select {...fieldProps('workerId', values, errors)} key="worker">
-            <option value="">{role === 'field' ? 'Elige el trabajador…' : 'Sin trabajador'}</option>
+            <option value="">
+              {!editing ? 'Crear un trabajador nuevo con este nombre' : role === 'field' ? 'Elige el trabajador…' : 'Sin trabajador'}
+            </option>
             {workers.map((worker) => (
               <option key={worker.id} value={worker.id} disabled={worker.taken}>
                 {worker.name}

@@ -487,7 +487,7 @@ export default async function RequerimientoPage({ searchParams }: { searchParams
                 {!canAssign ? null : workers.length === 0 ? (
                   <>
                     Sin trabajadores activos para asignar.{' '}
-                    <Link href="/operacion/trabajadores/nuevo" className="text-bl hover:underline">
+                    <Link href="/administracion/trabajadores/nuevo" className="text-bl hover:underline">
                       Registrar trabajador
                     </Link>
                   </>

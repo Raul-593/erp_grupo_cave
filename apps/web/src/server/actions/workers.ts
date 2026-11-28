@@ -33,7 +33,7 @@ export async function saveWorker(_prev: ActionState, formData: FormData): Promis
     return { status: 'error', message: toUserMessage(error), values };
   }
   revalidatePath('/operacion', 'layout');
-  redirect('/operacion/trabajadores');
+  redirect('/administracion/trabajadores');
 }
 
 /** Activa o desactiva un trabajador. Los trabajadores no se borran. */

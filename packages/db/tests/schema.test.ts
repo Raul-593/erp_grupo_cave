@@ -119,7 +119,7 @@ describe('estructura', () => {
     expect(rows[0]?.schema).toBe(config.schema);
   });
 
-  it('tiene las tablas de las migraciones 0001-0012', async () => {
+  it('tiene las tablas de las migraciones 0001-0013', async () => {
     const { rows } = await client.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = $1 AND tablename <> 'pgmigrations' ORDER BY 1`,
       [config.schema],
@@ -168,6 +168,7 @@ describe('estructura', () => {
       'check_payment_allocated',
       'check_payment_allocation',
       'check_project_ficha_extraction',
+      'create_app_user_link',
       'protect_tdr_extraction',
       'protect_tdr_items',
       'reject_audit_log_change',
@@ -914,8 +915,6 @@ describe('usuarios y auditoría (0009)', () => {
     const worker = await insertId(`INSERT INTO workers (full_name) VALUES ('Trabajador sintético') RETURNING id`, []);
     const supplier = await insertId(`INSERT INTO suppliers (name, kind) VALUES ('Proveedor sintético', 'external') RETURNING id`, []);
 
-    expect(await brokenRule(USER, ['Campo', 'field', null, null, null])).toBe('app_users_field_requires_worker');
-    expect(await brokenRule(USER, ['Proveedor', 'supplier', null, null, null])).toBe('app_users_supplier_link');
     expect(await brokenRule(USER, ['Contable', 'accounting', null, null, supplier])).toBe('app_users_supplier_link');
     expect(await brokenRule(USER, ['Proveedor', 'supplier', null, worker, supplier])).toBe('app_users_supplier_no_worker');
     expect(await brokenRule(USER, ['Otro', 'guest', null, null, null])).toBe('app_users_role_valid');
@@ -930,6 +929,32 @@ describe('usuarios y auditoría (0009)', () => {
     expect(await brokenRule(USER, ['Repetido', 'admin', 'campo@ejemplo.test', null, null])).toBe('app_users_email_key');
     expect(await brokenRule(USER, ['Mismo trabajador', 'accounting', null, worker, null])).toBe('app_users_worker_id_key');
     expect(await failureCode(`DELETE FROM workers WHERE id = $1`, [worker])).toBe(PgErrorCode.restrictViolation);
+  });
+
+  it('al crear un usuario sin vínculo crea su trabajador o su proveedor (0013)', async () => {
+    const LINKS = `SELECT u.worker_id, u.supplier_id, w.full_name AS worker_name, w.email AS worker_email, s.name AS supplier_name, s.kind
+                     FROM app_users u LEFT JOIN workers w ON w.id = u.worker_id LEFT JOIN suppliers s ON s.id = u.supplier_id
+                    WHERE u.id = $1`;
+    const field = await insertId(USER, ['  Campo nuevo ', 'field', 'nuevo@ejemplo.test', null, null]);
+    const accounting = await insertId(USER, ['Contable nuevo', 'accounting', null, null, null]);
+    const supplier = await insertId(USER, ['Proveedor nuevo', 'supplier', null, null, null]);
+    expect((await client.query(LINKS, [field])).rows[0]).toMatchObject({ worker_name: 'Campo nuevo', worker_email: 'nuevo@ejemplo.test', supplier_id: null });
+    expect((await client.query(LINKS, [accounting])).rows[0]).toMatchObject({ worker_name: 'Contable nuevo', supplier_id: null });
+    expect((await client.query(LINKS, [supplier])).rows[0]).toMatchObject({ worker_id: null, supplier_name: 'Proveedor nuevo', kind: 'external' });
+
+    // Con un vínculo elegido no crea nada.
+    const existing = await insertId(`INSERT INTO workers (full_name) VALUES ('Trabajador existente') RETURNING id`, []);
+    const before = Number((await client.query(`SELECT count(*) FROM workers`)).rows[0].count);
+    const linked = await insertId(USER, ['Vinculado', 'field', null, existing, null]);
+    expect((await client.query(LINKS, [linked])).rows[0]).toMatchObject({ worker_id: existing });
+    expect(Number((await client.query(`SELECT count(*) FROM workers`)).rows[0].count)).toBe(before);
+
+    // Solo al crear: quitar el vínculo después sigue prohibido.
+    expect(await brokenRule(`UPDATE app_users SET worker_id = NULL WHERE id = $1`, [field])).toBe('app_users_field_requires_worker');
+    expect(await brokenRule(`UPDATE app_users SET supplier_id = NULL WHERE id = $1`, [supplier])).toBe('app_users_supplier_link');
+    // Un alta rechazada no deja fichas sueltas.
+    expect(await brokenRule(USER, ['Huérfano', 'accounting', null, null, randomUUID()])).toBe('app_users_supplier_link');
+    expect((await client.query(`SELECT 1 FROM workers WHERE full_name = 'Huérfano'`)).rowCount).toBe(0);
   });
 
   it('no borra usuarios y deja siempre un superusuario activo', async () => {

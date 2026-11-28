@@ -33,7 +33,7 @@ export async function saveSupplier(_prev: ActionState, formData: FormData): Prom
     return { status: 'error', message: toUserMessage(error), values };
   }
   revalidatePath('/operacion', 'layout');
-  redirect('/operacion/proveedores');
+  redirect('/administracion/proveedores');
 }
 
 /** Activa o desactiva un proveedor. Los proveedores no se borran. */

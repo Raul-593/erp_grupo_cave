@@ -23,6 +23,14 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Paquete del workspace que exporta TypeScript.
   transpilePackages: ['@erp/db'],
+  // Trabajadores y Proveedores pasaron de Operación a Administración (PLAN.md, parte A).
+  async redirects() {
+    return ['trabajadores', 'proveedores'].map((catalog) => ({
+      source: `/operacion/${catalog}/:path*`,
+      destination: `/administracion/${catalog}/:path*`,
+      permanent: false,
+    }));
+  },
 };
 
 export default nextConfig;
