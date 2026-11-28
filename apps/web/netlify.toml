@@ -2,9 +2,21 @@
 # repositorio y el paquete es apps/web (desplegar con `netlify deploy --build --filter web`).
 # Los secretos no van aquí: se cargan en las variables de entorno del sitio en Netlify.
 [build]
-  command = "pnpm --filter web build"
-  publish = ".next"
+  # pnpm se invoca con corepack y se instala antes de compilar: algunas compilaciones (las de la
+  # CLI) no pasan por la etapa de instalación de Netlify ni tienen pnpm en el PATH. Cuando la
+  # etapa de instalación ya corrió, la instalación con --frozen-lockfile no hace nada.
+  command = "corepack pnpm install --frozen-lockfile && corepack pnpm --filter web build"
+  # Relativo a la base (raíz del repositorio), no a apps/web: Next.js compila en apps/web/.next.
+  publish = "apps/web/.next"
 
 [build.environment]
-  # package.json exige Node >= 24.11; pnpm se toma de "packageManager".
-  NODE_VERSION = "24.11.0"
+  # package.json exige Node >= 24.11; pnpm se toma de "packageManager" mediante corepack.
+  # No bajar de 24.22: el corepack 0.34 de Node 24.11.0 busca bin/pnpm.cjs, que pnpm 11+ ya no
+  # incluye, y la instalación de dependencias falla. Node 24.22.3 trae corepack 0.36 (compatible).
+  NODE_VERSION = "24.22.3"
+  # Evita que corepack pida confirmación al descargar pnpm.
+  COREPACK_ENABLE_DOWNLOAD_PROMPT = "0"
+  # Caché propia de corepack: la compartida (/opt/buildhome/.cache/node/corepack) puede conservar
+  # una entrada de pnpm 12.21.0 creada por un corepack antiguo que apunta a bin/pnpm.cjs (inexistente
+  # en pnpm 11+); corepack la reutiliza y pnpm no arranca. Esta carpeta solo la llena corepack 0.36+.
+  COREPACK_HOME = "/opt/buildhome/.cache/corepack-pnpm12"
