@@ -66,7 +66,7 @@ export default async function UsuariosPage() {
                     <td className="text-ink2">{user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Nunca'}</td>
                     <td>{user.active ? <Pill tone="ok">Activo</Pill> : <Pill>Inactivo</Pill>}</td>
                     <td>
-                      <div className="flex items-start justify-end gap-[7px]">
+                      <div className="flex items-start justify-end gap-1.75">
                         <Link href={`/administracion/usuarios/${user.id}/editar`} className="btn">
                           Editar
                         </Link>

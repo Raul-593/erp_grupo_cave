@@ -60,6 +60,13 @@ Las tareas completadas (usuarios y permisos, control de campo en Ejecución, rep
 - Arreglo: tras el cambio se renueva la sesión (`refreshSession`) y se entra a la página de inicio del rol. Si no se puede renovar, se cierra la sesión y `/entrar?contrasena=cambiada` pide entrar con la nueva.
 - Pruebas: test, typecheck, lint y build sin errores. **Sin prueba de punta a punta:** necesita un usuario de Supabase con contraseña temporal (lo prueba el usuario).
 
+### Corrección: uso desde el celular (pedido del usuario, 2026-11-28)
+
+- **Causa del margen derecho y del menú corto:** la página era más ancha que la pantalla y el celular la alejaba entera. La ensanchaban la barra superior (selector de proyecto + «Cerrar sesión» + tema: 415 px en una pantalla de 375) y, en las tablas, los textos solo para lector de pantalla (`sr-only`, en posición absoluta, se salían del contenedor con desplazamiento: 712 px en Usuarios).
+- **Arreglo** (`components/shell/AppShell.tsx`, `app/globals.css`): la barra superior se encoge (el selector de proyecto recorta el nombre; el rótulo «Proyecto» se oculta en pantallas angostas); `.tbl` es `position: relative`; el menú va de arriba abajo (`inset-y-0`, `dvh`) y bloquea el desplazamiento del fondo; al cambiar de módulo o pestaña con un enlace la página empieza arriba («Atrás» conserva su posición); la pestaña activa queda a la vista; en el celular los campos usan letra de 16 px para que iOS no acerque la página al tocarlos.
+- **rem:** las medidas en píxeles de `globals.css` y de las clases (35 archivos) pasaron a rem o a la escala de espaciado de Tailwind, con el mismo tamaño resultante; quedan en px solo bordes y líneas de 1–3 px. El corte de la barra lateral es el punto `shell:` (`--breakpoint-shell`, 55,0625rem = 881 px).
+- Pruebas: test (160), typecheck, lint y build sin errores; verificado en el navegador a 375 px (sin desborde en Requerimiento, Planificación, Abastecimiento, Ejecución, Proyectos, Usuarios, Trabajadores y alta de usuario) y en escritorio. **Sin probar en un teléfono real** (iOS/Android).
+
 ### Riesgos
 
 - Un alta con vínculo vacío por error crea un trabajador duplicado; se mitiga con la opción explícita del formulario y desactivándolo después (los trabajadores no se borran).

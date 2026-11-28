@@ -123,7 +123,7 @@ export function EvidenceUploader({ itemId, maxBytes }: { itemId: string; maxByte
   return (
     <div className="p-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-[220px] flex-1">
+        <div className="min-w-55 flex-1">
           <label className="label" htmlFor="foto-descripcion">
             Descripción (opcional, se aplica a las fotos que guardes ahora)
           </label>
@@ -169,38 +169,38 @@ export function EvidenceUploader({ itemId, maxBytes }: { itemId: string; maxByte
         <button type="button" className="btn btn-p !py-2.5 md:hidden" disabled={busy} onClick={() => cameraRef.current?.click()}>
           ◉ Tomar foto
         </button>
-        <button type="button" className="btn !py-2.5 md:!py-[7px]" disabled={busy} onClick={() => inputRef.current?.click()}>
+        <button type="button" className="btn !py-2.5 md:!py-1.75" disabled={busy} onClick={() => inputRef.current?.click()}>
           ◎ {selected.length > 0 ? 'Añadir más' : 'Elegir fotografías'}
         </button>
       </div>
-      <p className="mt-2 text-[11.5px] text-mut">
+      <p className="mt-2 text-[0.71875rem] text-mut">
         JPEG, PNG o WebP · máximo {formatBytes(maxBytes)} por foto · puedes elegir varias. Las fotos elegidas no se guardan hasta que
         pulses «Guardar». En un celular, «Tomar foto» abre la cámara y «Elegir fotografías» la galería.
       </p>
 
       {selected.length > 0 ? (
         <div className="mt-3 rounded-md border border-wa/40 bg-wab/40 p-3">
-          <p className="text-[9px] font-semibold tracking-[0.1em] text-wa uppercase" aria-live="polite">
+          <p className="text-[0.5625rem] font-semibold tracking-[0.1em] text-wa uppercase" aria-live="polite">
             {selected.length} {selected.length === 1 ? 'fotografía elegida' : 'fotografías elegidas'} · sin guardar
           </p>
-          <ul className="mt-2.5 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+          <ul className="mt-2.5 grid grid-cols-[repeat(auto-fill,minmax(9.375rem,1fr))] gap-3">
             {selected.map((entry) => (
               <li key={entry.key} className="overflow-hidden rounded-md border border-line bg-card">
                 {/* Vista previa local de un archivo que aún no se ha enviado. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={entry.preview} alt={`Vista previa de ${entry.file.name}`} className="aspect-[4/3] w-full bg-line object-cover" />
                 <div className="px-2.5 py-2">
-                  <p className="text-[11.5px] font-medium break-all">{entry.file.name}</p>
-                  <p className="text-[11px] text-mut2">{formatBytes(entry.file.size)}</p>
-                  {entry.status === 'uploading' ? <p className="text-[11px] font-semibold text-bl">Guardando…</p> : null}
+                  <p className="text-[0.71875rem] font-medium break-all">{entry.file.name}</p>
+                  <p className="text-[0.6875rem] text-mut2">{formatBytes(entry.file.size)}</p>
+                  {entry.status === 'uploading' ? <p className="text-[0.6875rem] font-semibold text-bl">Guardando…</p> : null}
                   {entry.status === 'error' ? (
-                    <p role="alert" className="text-[11px] leading-snug text-ba">
+                    <p role="alert" className="text-[0.6875rem] leading-snug text-ba">
                       {entry.message}
                     </p>
                   ) : null}
                   <button
                     type="button"
-                    className="mt-1.5 text-[11px] font-semibold text-bl hover:underline disabled:opacity-50"
+                    className="mt-1.5 text-[0.6875rem] font-semibold text-bl hover:underline disabled:opacity-50"
                     disabled={busy}
                     aria-label={`Quitar ${entry.file.name} de la selección`}
                     onClick={() => discard([entry.key])}

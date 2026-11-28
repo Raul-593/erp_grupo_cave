@@ -27,7 +27,7 @@ export function Field({
         {label}
       </label>
       {children}
-      {hint ? <p className="mt-1 text-[11px] text-mut2">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-[0.6875rem] text-mut2">{hint}</p> : null}
       <FieldError errors={errors?.[name]} />
     </div>
   );

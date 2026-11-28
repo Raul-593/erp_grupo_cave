@@ -34,7 +34,7 @@ export function SignInForm({ groups }: { groups: SignInGroup[] }) {
         {pending ? 'Entrando…' : 'Entrar'}
       </button>
       {state?.message ? (
-        <p role="alert" className="text-[12px] text-ba">
+        <p role="alert" className="text-[0.75rem] text-ba">
           {state.message}
         </p>
       ) : null}

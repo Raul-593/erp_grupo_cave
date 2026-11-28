@@ -49,7 +49,7 @@ export function FichaProposal({
         </>
       }
     >
-      <form action={action} key={`${projectVersion}`} className="text-[12.5px]">
+      <form action={action} key={`${projectVersion}`} className="text-[0.78125rem]">
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="version" value={projectVersion} />
         <input type="hidden" name="extractionId" value={extractionId} />
@@ -103,7 +103,7 @@ export function FichaProposal({
           </fieldset>
         ) : null}
         {observacion ? (
-          <p className="border-t border-line px-4 py-2.5 text-[11.5px] text-mut">
+          <p className="border-t border-line px-4 py-2.5 text-[0.71875rem] text-mut">
             <b className="font-semibold text-ink2">Observación de la IA:</b> {observacion}
           </p>
         ) : null}
@@ -111,7 +111,7 @@ export function FichaProposal({
           <button type="submit" className="btn btn-p" disabled={pending}>
             {pending ? 'Aplicando…' : 'Aplicar a la ficha del proyecto'}
           </button>
-          <span className="text-[11.5px] text-mut">Desmarca lo que no quieras aplicar. Se puede aplicar antes o después de confirmar la matriz.</span>
+          <span className="text-[0.71875rem] text-mut">Desmarca lo que no quieras aplicar. Se puede aplicar antes o después de confirmar la matriz.</span>
           <FormMessage status={state.status} message={state.message} />
         </div>
       </form>
@@ -140,7 +140,7 @@ export function StartManualButton({ documentId }: { documentId: string }) {
         {pending ? 'Creando…' : 'Empezar matriz a mano'}
       </button>
       {error ? (
-        <span role="alert" className="text-[12px] text-ba">
+        <span role="alert" className="text-[0.75rem] text-ba">
           {error}
         </span>
       ) : null}

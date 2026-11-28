@@ -96,7 +96,7 @@ export default async function EvidenciasItemPage({ params }: { params: Promise<{
             <p>Sube la primera fotografía de este entregable para dejar evidencia de su cumplimiento.</p>
           </EmptyState>
         ) : (
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 p-4">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(13.75rem,1fr))] gap-4 p-4">
             {evidences.map((evidence) => (
               <li key={evidence.id} className="overflow-hidden rounded-md border border-line bg-bg">
                 <a href={`/api/evidencias/${evidence.id}`} target="_blank" rel="noopener" title="Abrir a tamaño completo">
@@ -111,11 +111,11 @@ export default async function EvidenciasItemPage({ params }: { params: Promise<{
                   />
                 </a>
                 <div className="bg-card px-3 py-2.5">
-                  <p className="text-[12.5px] font-medium break-words">{evidence.description ?? <span className="text-mut">Sin descripción</span>}</p>
-                  <p className="mt-0.5 text-[11px] break-all text-mut2">
+                  <p className="text-[0.78125rem] font-medium break-words">{evidence.description ?? <span className="text-mut">Sin descripción</span>}</p>
+                  <p className="mt-0.5 text-[0.6875rem] break-all text-mut2">
                     {evidence.originalFilename} · {formatBytes(evidence.sizeBytes)}
                   </p>
-                  <p className="text-[11px] text-mut2">
+                  <p className="text-[0.6875rem] text-mut2">
                     Cargada el {formatDateTime(evidence.uploadedAt)}
                     {evidence.uploadedByName ? ` por ${evidence.uploadedByName}` : ''}
                   </p>

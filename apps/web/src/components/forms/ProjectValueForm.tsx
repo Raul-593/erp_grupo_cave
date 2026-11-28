@@ -35,7 +35,7 @@ export function ProjectValueForm({
       <input type="hidden" name="id" value={projectId} />
       <input type="hidden" name="version" value={version} />
       <ProjectValueFields values={values} errors={errors} />
-      <div className="flex flex-col gap-1.5 sm:pt-[19px]">
+      <div className="flex flex-col gap-1.5 sm:pt-4.75">
         <button type="submit" className="btn btn-p" disabled={pending}>
           {pending ? 'Guardando…' : 'Guardar valor'}
         </button>

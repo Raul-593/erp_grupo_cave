@@ -15,7 +15,7 @@ const PILL_TONES: Record<Tone, string> = {
 export function Pill({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded px-[7px] py-[3px] text-[9.5px] font-semibold tracking-[0.05em] uppercase ${PILL_TONES[tone]}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded px-1.75 py-0.75 text-[0.59375rem] font-semibold tracking-[0.05em] uppercase ${PILL_TONES[tone]}`}
     >
       {children}
     </span>
@@ -24,12 +24,12 @@ export function Pill({ tone = 'neutral', children }: { tone?: Tone; children: Re
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-[18px] flex flex-wrap items-start gap-5">
+    <div className="mb-4.5 flex flex-wrap items-start gap-5">
       <div>
-        <h1 className="text-[17px] font-semibold tracking-[0.05em] uppercase">{title}</h1>
-        {subtitle ? <p className="mt-[5px] max-w-[78ch] text-[12.5px] text-mut">{subtitle}</p> : null}
+        <h1 className="text-[1.0625rem] font-semibold tracking-[0.05em] uppercase">{title}</h1>
+        {subtitle ? <p className="mt-1.25 max-w-[78ch] text-[0.78125rem] text-mut">{subtitle}</p> : null}
       </div>
-      {actions ? <div className="ml-auto flex flex-wrap gap-[7px]">{actions}</div> : null}
+      {actions ? <div className="ml-auto flex flex-wrap gap-1.75">{actions}</div> : null}
     </div>
   );
 }
@@ -49,8 +49,8 @@ export function Card({
     <section className="card">
       {title || actions ? (
         <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
-          {title ? <h2 className="text-[10.5px] font-semibold tracking-[0.1em] text-ink2 uppercase">{title}</h2> : null}
-          {actions ? <div className="ml-auto flex items-center gap-[7px]">{actions}</div> : null}
+          {title ? <h2 className="text-[0.65625rem] font-semibold tracking-[0.1em] text-ink2 uppercase">{title}</h2> : null}
+          {actions ? <div className="ml-auto flex items-center gap-1.75">{actions}</div> : null}
         </header>
       ) : null}
       <div className={bodyClassName}>{children}</div>
@@ -61,28 +61,28 @@ export function Card({
 export function EmptyState({ icon = '◷', title, children }: { icon?: string; title: string; children?: ReactNode }) {
   return (
     <div className="px-5 py-16 text-center text-mut">
-      <div className="mx-auto mb-3.5 grid size-11 place-items-center rounded-[10px] bg-bl2 text-lg text-bl" aria-hidden>
+      <div className="mx-auto mb-3.5 grid size-11 place-items-center rounded-[0.625rem] bg-bl2 text-lg text-bl" aria-hidden>
         {icon}
       </div>
-      <h3 className="mb-[7px] text-sm font-semibold tracking-[0.04em] text-ink uppercase">{title}</h3>
-      {children ? <div className="mx-auto max-w-[52ch] text-[12.5px] leading-[1.7]">{children}</div> : null}
+      <h3 className="mb-1.75 text-sm font-semibold tracking-[0.04em] text-ink uppercase">{title}</h3>
+      {children ? <div className="mx-auto max-w-[52ch] text-[0.78125rem] leading-[1.7]">{children}</div> : null}
     </div>
   );
 }
 
 /** Nota informativa azul del prototipo. */
 export function Note({ children }: { children: ReactNode }) {
-  return <div className="rounded-md bg-bl2 px-[13px] py-[11px] text-xs leading-[1.6] text-ink2">{children}</div>;
+  return <div className="rounded-md bg-bl2 px-3.25 py-2.75 text-xs leading-[1.6] text-ink2">{children}</div>;
 }
 
 /** Cuadrícula etiqueta/valor («ficha») del prototipo. */
 export function FichaGrid({ items }: { items: { label: string; value: ReactNode; ai?: boolean }[] }) {
   return (
-    <dl className="grid grid-cols-[repeat(auto-fit,minmax(152px,1fr))] gap-px bg-line">
+    <dl className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-px bg-line">
       {items.map((item) => (
         <div key={item.label} className="bg-card px-4 py-3">
-          <dt className="text-[8.5px] font-semibold tracking-[0.1em] text-mut2 uppercase">{item.label}</dt>
-          <dd className={`mt-[5px] text-[13px] font-medium ${item.ai ? 'text-vi' : ''}`}>{item.value}</dd>
+          <dt className="text-[0.53125rem] font-semibold tracking-[0.1em] text-mut2 uppercase">{item.label}</dt>
+          <dd className={`mt-1.25 text-[0.8125rem] font-medium ${item.ai ? 'text-vi' : ''}`}>{item.value}</dd>
         </div>
       ))}
     </dl>
@@ -91,7 +91,7 @@ export function FichaGrid({ items }: { items: { label: string; value: ReactNode;
 
 export function FieldError({ errors }: { errors?: string[] | undefined }) {
   if (!errors?.length) return null;
-  return <p className="mt-1 text-[11.5px] text-ba">{errors[0]}</p>;
+  return <p className="mt-1 text-[0.71875rem] text-ba">{errors[0]}</p>;
 }
 
 export function FormMessage({ status, message }: { status: 'idle' | 'ok' | 'error'; message?: string | undefined }) {

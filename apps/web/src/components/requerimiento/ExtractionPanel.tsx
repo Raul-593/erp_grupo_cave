@@ -32,18 +32,18 @@ export function ExtractionPanel({ extraction, output }: { extraction: Extraction
   return (
     <div className="border-t border-line px-4 py-3.5" aria-live="polite">
       <div className="flex flex-wrap items-center gap-2.5">
-        <span className="text-[9px] font-semibold tracking-[0.1em] text-mut2 uppercase">Último procesamiento</span>
+        <span className="text-[0.5625rem] font-semibold tracking-[0.1em] text-mut2 uppercase">Último procesamiento</span>
         <Pill tone={tone}>{label}</Pill>
         {summary ? (
           <Pill tone={demo ? 'wa' : 'vi'}>
             {demo ? 'Datos de demostración' : '◆ Propuesta IA'} · {summary.items} ítems en {summary.rubros} rubros
           </Pill>
         ) : null}
-        <span className="text-[11.5px] text-mut">
+        <span className="text-[0.71875rem] text-mut">
           {extraction.provider} · {extraction.model} · prompt {extraction.promptVersion} · esquema {extraction.schemaVersion}
         </span>
       </div>
-      <p className="mt-1.5 text-[11.5px] text-mut2">
+      <p className="mt-1.5 text-[0.71875rem] text-mut2">
         Iniciado el {formatDateTime(extraction.createdAt)}
         {seconds !== null ? ` · duración ${seconds.toLocaleString('es-EC')} s` : ''}
         {extraction.totalTokens !== null
@@ -60,7 +60,7 @@ export function ExtractionPanel({ extraction, output }: { extraction: Extraction
       {output ? (
         <div className="mt-3 overflow-hidden rounded-md border border-line">
           <div
-            className={`px-3 py-1.5 text-[9px] font-semibold tracking-[0.1em] uppercase ${demo ? 'bg-wab text-wa' : 'bg-vib text-vi'}`}
+            className={`px-3 py-1.5 text-[0.5625rem] font-semibold tracking-[0.1em] uppercase ${demo ? 'bg-wab text-wa' : 'bg-vib text-vi'}`}
           >
             {demo
               ? 'Ficha de demostración · datos ilustrativos del prototipo, no provienen de un TDR'
@@ -97,14 +97,14 @@ export function ExtractionPanel({ extraction, output }: { extraction: Extraction
 
       {extraction.rawResponse !== null ? (
         <details className="mt-3">
-          <summary className="cursor-pointer text-[11.5px] font-medium text-bl">
+          <summary className="cursor-pointer text-[0.71875rem] font-medium text-bl">
             {extraction.status === 'failed'
               ? 'Ver la respuesta recibida y los problemas encontrados (para ajustar el prompt)'
               : demo
                 ? 'Ver el JSON de demostración'
                 : 'Ver el JSON original de la IA'}
           </summary>
-          <pre className="mt-2 max-h-[420px] overflow-auto rounded-md bg-bg p-3 text-[11px] leading-relaxed whitespace-pre-wrap text-ink2">
+          <pre className="mt-2 max-h-105 overflow-auto rounded-md bg-bg p-3 text-[0.6875rem] leading-relaxed whitespace-pre-wrap text-ink2">
             {JSON.stringify(extraction.rawResponse, null, 2)}
           </pre>
         </details>

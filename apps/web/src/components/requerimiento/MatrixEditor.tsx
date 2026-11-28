@@ -36,8 +36,8 @@ export interface EditorGroup {
 export const NEW_ITEM_FIELD_ID = 'nuevo-item-producto';
 const RUBROS_LIST_ID = 'rubros-matriz';
 
-const INPUT = 'field !px-2 !py-[5px] read-only:opacity-60';
-const NUMBER_INPUT = `${INPUT} w-[74px] text-right tabular-nums`;
+const INPUT = 'field !px-2 !py-1.25 read-only:opacity-60';
+const NUMBER_INPUT = `${INPUT} w-18.5 text-right tabular-nums`;
 
 /** Campo de una fila que se guarda al salir (Enter guarda, Esc deshace; D-3). */
 function DraftInput({
@@ -85,7 +85,7 @@ function DraftInput({
   };
   const tone = proposed ? ' text-vi' : '';
   return multiline ? (
-    <textarea key={key} {...common} rows={2} className={`${className} min-w-[200px] resize-y${tone}`} />
+    <textarea key={key} {...common} rows={2} className={`${className} min-w-50 resize-y${tone}`} />
   ) : (
     <input key={key} {...common} list={listId} autoComplete="off" className={`${className}${tone}`} />
   );
@@ -116,14 +116,14 @@ function DraftRow({ row, workers }: { row: EditorRow; workers: Option[] }) {
       <td>
         <b className="font-semibold tabular-nums">{row.code}</b>
       </td>
-      <td className="min-w-[190px]">
+      <td className="min-w-47.5">
         {cell('producto', 'Producto')}
-        <div className="mt-1">{cell('rubro', 'Rubro', { listId: RUBROS_LIST_ID, className: `${INPUT} !text-[11.5px]` })}</div>
+        <div className="mt-1">{cell('rubro', 'Rubro', { listId: RUBROS_LIST_ID, className: `${INPUT} !text-[0.71875rem]` })}</div>
       </td>
-      <td className="min-w-[130px]">{cell('subproducto', 'Subproducto')}</td>
+      <td className="min-w-32.5">{cell('subproducto', 'Subproducto')}</td>
       <td>{cell('descripcion', 'Descripción', { multiline: true })}</td>
       <td className="num">{cell('cant', 'Cantidad', { className: NUMBER_INPUT })}</td>
-      <td className="min-w-[96px]">{cell('unidad', 'Unidad')}</td>
+      <td className="min-w-24">{cell('unidad', 'Unidad')}</td>
       <td className="num">{cell('dias', 'Días', { className: NUMBER_INPUT })}</td>
       <td>{cell('observacion', 'Observaciones', { multiline: true })}</td>
       <td className="whitespace-nowrap">
@@ -178,7 +178,7 @@ function AddItemForm({ extractionId, defaultRubro }: { extractionId: string; def
   const values = state.status === 'error' ? (state.values ?? {}) : {};
   const errors = state.status === 'error' ? state.fieldErrors : undefined;
   return (
-    <form action={action} className="grid gap-2 border-t border-line px-4 py-3 md:grid-cols-[180px_1fr_1.4fr_auto] md:items-start">
+    <form action={action} className="grid gap-2 border-t border-line px-4 py-3 md:grid-cols-[11.25rem_1fr_1.4fr_auto] md:items-start">
       <input type="hidden" name="extractionId" value={extractionId} />
       <div>
         <label className="label" htmlFor="nuevo-item-rubro">
@@ -224,7 +224,7 @@ function AddItemForm({ extractionId, defaultRubro }: { extractionId: string; def
           autoComplete="off"
         />
       </div>
-      <div className="md:pt-[19px]">
+      <div className="md:pt-4.75">
         <button type="submit" className="btn btn-p" disabled={pending}>
           {pending ? 'Añadiendo…' : '+ Añadir ítem'}
         </button>
@@ -261,7 +261,7 @@ function ConfirmMatrix({
     );
   }
   return (
-    <div role="dialog" aria-label="Confirmar matriz" className="min-w-0 basis-full rounded-md border border-bl bg-bl2 px-4 py-3 text-[12.5px]">
+    <div role="dialog" aria-label="Confirmar matriz" className="min-w-0 basis-full rounded-md border border-bl bg-bl2 px-4 py-3 text-[0.78125rem]">
       <p className="font-semibold text-ink">¿Confirmar la matriz de entregables?</p>
       <p className="mt-1 text-ink2">{summary}</p>
       <p className="mt-1 text-ink2">
@@ -288,7 +288,7 @@ function ConfirmMatrix({
           Cancelar
         </button>
         {error ? (
-          <span role="alert" className="text-[12px] text-ba">
+          <span role="alert" className="text-[0.75rem] text-ba">
             {error}
           </span>
         ) : null}
@@ -348,7 +348,7 @@ export function MatrixEditor({
           {groups.map((group) => (
             <tbody key={group.number}>
               <tr className="bg-bg">
-                <th scope="colgroup" colSpan={10} className="!py-2 text-left text-[10.5px] font-semibold tracking-[0.08em] text-ink2 uppercase">
+                <th scope="colgroup" colSpan={10} className="!py-2 text-left text-[0.65625rem] font-semibold tracking-[0.08em] text-ink2 uppercase">
                   {group.number} · {group.rubro}
                   <span className="ml-2 font-normal tracking-normal text-mut normal-case">
                     {group.rows.length} {group.rows.length === 1 ? 'ítem' : 'ítems'}
@@ -363,10 +363,10 @@ export function MatrixEditor({
         </table>
       </div>
       {itemCount === 0 ? (
-        <p className="px-4 py-3 text-[12.5px] text-mut">La matriz está vacía. Añade el primer ítem con el formulario de abajo.</p>
+        <p className="px-4 py-3 text-[0.78125rem] text-mut">La matriz está vacía. Añade el primer ítem con el formulario de abajo.</p>
       ) : null}
       <AddItemForm extractionId={extractionId} defaultRubro={rubros.at(-1) ?? ''} />
-      <div className="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-4 py-2.5 text-[11.5px] text-mut">
+      <div className="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-4 py-2.5 text-[0.71875rem] text-mut">
         <span>{summary}</span>
         <ConfirmMatrix extractionId={extractionId} extractionVersion={extractionVersion} summary={summary} disabled={itemCount === 0} />
       </div>

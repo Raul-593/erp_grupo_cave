@@ -32,8 +32,8 @@ export default async function EntrarPage({ searchParams }: { searchParams: Promi
   if (problem) {
     return (
       <Frame>
-        <p className="text-[12.5px] font-semibold text-ba">No se puede entrar en este entorno.</p>
-        <p className="text-[12.5px] text-mut">{problem}</p>
+        <p className="text-[0.78125rem] font-semibold text-ba">No se puede entrar en este entorno.</p>
+        <p className="text-[0.78125rem] text-mut">{problem}</p>
       </Frame>
     );
   }
@@ -43,7 +43,7 @@ export default async function EntrarPage({ searchParams }: { searchParams: Promi
     return (
       <Frame>
         {current ? (
-          <p className="text-[12.5px]">
+          <p className="text-[0.78125rem]">
             Ya entraste como <b className="font-semibold">{current.fullName}</b>.{' '}
             <Link href={homePath(current.role)} className="text-bl hover:underline">
               Continuar
@@ -51,7 +51,7 @@ export default async function EntrarPage({ searchParams }: { searchParams: Promi
           </p>
         ) : null}
         {passwordChanged && !current ? (
-          <p role="status" className="text-[12.5px] text-ok">
+          <p role="status" className="text-[0.78125rem] text-ok">
             Tu contraseña se cambió. Entra con la contraseña nueva.
           </p>
         ) : null}
@@ -72,12 +72,12 @@ export default async function EntrarPage({ searchParams }: { searchParams: Promi
 
   return (
     <Frame>
-      <p className="rounded-md bg-wab px-3 py-2 text-[11.5px] text-wa">
+      <p className="rounded-md bg-wab px-3 py-2 text-[0.71875rem] text-wa">
         Ingreso de desarrollo sin contraseña: solo funciona en este computador y con la base de datos local. El ingreso con correo y
         contraseña se activará al migrar a Supabase.
       </p>
       {current ? (
-        <p className="text-[12.5px]">
+        <p className="text-[0.78125rem]">
           Ya entraste como <b className="font-semibold">{current.fullName}</b> ({ROLE_LABELS[current.role]}).{' '}
           <Link href={homePath(current.role)} className="text-bl hover:underline">
             Continuar
@@ -87,11 +87,11 @@ export default async function EntrarPage({ searchParams }: { searchParams: Promi
       {groups.length > 0 ? (
         <SignInForm groups={groups} />
       ) : (
-        <p className="text-[12.5px] text-mut">
+        <p className="text-[0.78125rem] text-mut">
           Todavía no hay usuarios activos. Créalos con <code>pnpm db:users:example</code> (ver MEMORY.md).
         </p>
       )}
-      <ul className="grid gap-1.5 border-t border-line pt-3 text-[11.5px] text-mut">
+      <ul className="grid gap-1.5 border-t border-line pt-3 text-[0.71875rem] text-mut">
         {USER_ROLES.map((role) => (
           <li key={role}>
             <b className="font-semibold text-ink2">{ROLE_LABELS[role]}:</b> {ROLE_DESCRIPTIONS[role]}

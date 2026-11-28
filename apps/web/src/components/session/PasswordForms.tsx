@@ -6,7 +6,7 @@ import { changeOwnPassword, signInWithPassword } from '@/server/actions/session'
 function Message({ text }: { text: string | undefined }) {
   if (!text) return null;
   return (
-    <p role="alert" className="text-[12px] text-ba">
+    <p role="alert" className="text-[0.75rem] text-ba">
       {text}
     </p>
   );
@@ -33,7 +33,7 @@ export function PasswordSignInForm() {
         {pending ? 'Entrando…' : 'Entrar'}
       </button>
       <Message text={state?.message} />
-      <p className="text-[11.5px] text-mut">¿Olvidaste tu contraseña? Pide al administrador una contraseña temporal nueva.</p>
+      <p className="text-[0.71875rem] text-mut">¿Olvidaste tu contraseña? Pide al administrador una contraseña temporal nueva.</p>
     </form>
   );
 }

@@ -123,7 +123,7 @@ export function UserForm({
           </select>
         </Field>
       )}
-      <label className="flex items-center gap-2 text-[12.5px] md:col-span-2">
+      <label className="flex items-center gap-2 text-[0.78125rem] md:col-span-2">
         <input type="checkbox" name="active" defaultChecked={values['active'] === 'on' || values['active'] === 'true'} />
         Activo (puede entrar al sistema)
       </label>

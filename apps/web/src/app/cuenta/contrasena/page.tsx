@@ -18,14 +18,14 @@ export default async function CambiarContrasenaPage() {
   if (configuredAuthProvider() !== 'supabase') redirect(homePath(session.user.role));
   return (
     <AuthFrame subtitle="Cambiar contraseña">
-      <p className="text-[12.5px]">
+      <p className="text-[0.78125rem]">
         Hola, <b className="font-semibold">{session.user.fullName}</b>.{' '}
         {session.mustChangePassword
           ? 'Entraste con una contraseña temporal: elige una propia para continuar.'
           : 'Elige tu contraseña nueva.'}
       </p>
       <ChangePasswordForm minLength={MIN_PASSWORD_LENGTH} />
-      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3 text-[12px]">
+      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3 text-[0.75rem]">
         {!session.mustChangePassword ? (
           <Link href={homePath(session.user.role)} className="text-bl hover:underline">
             Volver

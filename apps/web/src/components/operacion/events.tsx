@@ -35,7 +35,7 @@ export function EventTabs({
   return (
     <div className="mb-4 rounded-md border border-line bg-card px-3.5 py-3">
       <nav aria-label="Evento" className="flex flex-wrap items-center gap-2">
-        <span className="text-[9px] font-semibold tracking-[0.1em] text-mut2 uppercase">Evento</span>
+        <span className="text-[0.5625rem] font-semibold tracking-[0.1em] text-mut2 uppercase">Evento</span>
         {events.map((event) => {
           const active = event.id === current?.id;
           return (
@@ -43,7 +43,7 @@ export function EventTabs({
               key={event.id}
               href={eventHref(basePath, event.id, params)}
               aria-current={active ? 'page' : undefined}
-              className={`rounded-[5px] border px-3.5 py-2 text-[11.5px] font-semibold tracking-[0.05em] uppercase ${
+              className={`rounded-[0.3125rem] border px-3.5 py-2 text-[0.71875rem] font-semibold tracking-[0.05em] uppercase ${
                 active ? 'border-bl bg-bl text-white' : 'border-line text-ink2 hover:border-bl hover:text-bl'
               }`}
             >
@@ -53,7 +53,7 @@ export function EventTabs({
         })}
       </nav>
       {current ? (
-        <p className="mt-2 text-[11.5px] text-mut">
+        <p className="mt-2 text-[0.71875rem] text-mut">
           Estás viendo <b className="font-semibold text-ink">{current.name}</b>
           {current.scheduleText ? ` · ${current.scheduleText}` : ''}
         </p>
@@ -97,16 +97,16 @@ export function ProductHeading({ group, extra }: { group: ProductGroup; extra?: 
   return (
     <>
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-        {group.tdrRef ? <span className="rounded bg-nav px-1.5 py-0.5 text-[10.5px] font-semibold text-white tabular-nums">{group.tdrRef}</span> : null}
-        <b className="text-[12.5px] font-semibold tracking-[0.03em] uppercase">{group.producto}</b>
-        {group.productoCodigo ? <span className="text-[10.5px] text-mut2">{group.productoCodigo}</span> : null}
-        <span className="text-[10.5px] text-mut2">
+        {group.tdrRef ? <span className="rounded bg-nav px-1.5 py-0.5 text-[0.65625rem] font-semibold text-white tabular-nums">{group.tdrRef}</span> : null}
+        <b className="text-[0.78125rem] font-semibold tracking-[0.03em] uppercase">{group.producto}</b>
+        {group.productoCodigo ? <span className="text-[0.65625rem] text-mut2">{group.productoCodigo}</span> : null}
+        <span className="text-[0.65625rem] text-mut2">
           {group.items.length} {group.items.length === 1 ? 'requerimiento' : 'requerimientos'}
         </span>
         {extra}
       </div>
       {group.productoDescripcion ? (
-        <details className="mt-1 text-[11.5px] text-mut">
+        <details className="mt-1 text-[0.71875rem] text-mut">
           <summary className="cursor-pointer select-none text-bl">Descripción del TDR</summary>
           <p className="mt-1 max-w-[110ch] leading-[1.55] whitespace-pre-line normal-case">{group.productoDescripcion}</p>
         </details>
@@ -199,11 +199,11 @@ export function EventMatrixTable({
                     <td>
                       <b className="font-semibold tabular-nums">{item.code}</b>
                     </td>
-                    <td className="min-w-[260px]">
+                    <td className="min-w-65">
                       <b className="font-semibold">{item.subproducto ?? item.producto}</b>
                       {item.categoria ? <small>{item.categoria}</small> : null}
-                      {item.descripcion ? <p className="mt-1 text-[11.5px] leading-[1.5] text-ink2">{item.descripcion}</p> : null}
-                      {item.observacion ? <p className="mt-1 text-[11px] leading-[1.5] whitespace-pre-line text-mut">{item.observacion}</p> : null}
+                      {item.descripcion ? <p className="mt-1 text-[0.71875rem] leading-[1.5] text-ink2">{item.descripcion}</p> : null}
+                      {item.observacion ? <p className="mt-1 text-[0.6875rem] leading-[1.5] whitespace-pre-line text-mut">{item.observacion}</p> : null}
                     </td>
                     <td>{item.supplierName ?? <span className="text-mut">—</span>}</td>
                     <td className="num">{formatQuantity(item.dias)}</td>

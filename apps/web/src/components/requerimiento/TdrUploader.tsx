@@ -111,17 +111,17 @@ export function TdrUploader({ projectId, maxBytes, compact }: { projectId: strin
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        className={`rounded-lg border border-dashed text-center text-[12.5px] transition-colors ${
+        className={`rounded-lg border border-dashed text-center text-[0.78125rem] transition-colors ${
           compact ? 'px-4 py-4' : 'px-5 py-8'
         } ${dragging ? 'border-bl bg-bl2' : 'border-line2 bg-bg'} ${busy ? 'cursor-progress' : 'cursor-pointer hover:border-bl'}`}
       >
         {state.kind === 'uploading' ? (
           <div className="mx-auto max-w-md" aria-live="polite">
             <p className="font-medium text-ink">Cargando «{state.filename}»…</p>
-            <div className="mt-2 h-[5px] overflow-hidden rounded-[3px] bg-line" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
-              <i className="block h-full rounded-[3px] bg-bl transition-[width]" style={{ width: `${percent}%` }} />
+            <div className="mt-2 h-1.25 overflow-hidden rounded-[0.1875rem] bg-line" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
+              <i className="block h-full rounded-[0.1875rem] bg-bl transition-[width]" style={{ width: `${percent}%` }} />
             </div>
-            <p className="mt-1.5 text-[11.5px] text-mut">
+            <p className="mt-1.5 text-[0.71875rem] text-mut">
               {formatBytes(state.loaded)} de {formatBytes(state.size)} · {percent}%
             </p>
             <button

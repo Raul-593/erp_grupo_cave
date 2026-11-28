@@ -23,13 +23,13 @@ export function EventChecklist({ items, canUpload }: { items: readonly MatrixRow
               const detail = [item.categoria, item.supplierName].filter(Boolean).join(' · ');
               return (
                 <li key={item.id} className="flex flex-wrap items-center gap-x-4 gap-y-2.5 border-t border-line px-4 py-3">
-                  <div className="min-w-0 flex-1 basis-[250px]">
-                    <p className="text-[13px] leading-snug">
+                  <div className="min-w-0 flex-1 basis-62.5">
+                    <p className="text-[0.8125rem] leading-snug">
                       <b className="mr-1.5 font-semibold tabular-nums text-mut">{item.code}</b>
                       <b className="font-semibold">{item.subproducto ?? item.producto}</b>
                     </p>
-                    {detail ? <p className="mt-0.5 text-[11px] text-mut2">{detail}</p> : null}
-                    {item.descripcion ? <p className="mt-0.5 text-[11.5px] leading-[1.45] text-ink2">{item.descripcion}</p> : null}
+                    {detail ? <p className="mt-0.5 text-[0.6875rem] text-mut2">{detail}</p> : null}
+                    {item.descripcion ? <p className="mt-0.5 text-[0.71875rem] leading-[1.45] text-ink2">{item.descripcion}</p> : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <div>
@@ -39,7 +39,7 @@ export function EventChecklist({ items, canUpload }: { items: readonly MatrixRow
                       <MountSelect itemId={item.id} itemLabel={item.code} status={item.mountStatus ?? 'not_started'} version={item.executionVersion} />
                     </div>
                     <PhotosLink item={item} canUpload={canUpload} large />
-                    <span className="min-w-[84px]">
+                    <span className="min-w-21">
                       {item.evidenceCount === 0 ? (
                         <Pill tone="wa">Falta foto</Pill>
                       ) : status === 'ready' ? (

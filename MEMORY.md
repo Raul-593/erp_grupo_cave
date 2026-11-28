@@ -42,9 +42,9 @@
 - Bash de esta máquina: heredocs largos con comillas fallan o los bloquea la comprobación de seguridad; escribir scripts con Write y ejecutarlos. `pg_dump` desde Bash con la URL de `.env` se queda colgado: lanzarlo desde Node con `PGPASSWORD` y `-w`.
 - Supabase Auth: los metadatos del usuario viajan en el token; tras `updateUser` hay que `refreshSession()` o la app sigue leyendo los anteriores. Tras mover rutas, borrar `apps/web/.next/dev/types` (tipos viejos rompen typecheck/build). Tras `pnpm build` hay que reiniciar `web-verificacion` / `web-supabase` (puerto 3200, contra Supabase). Con dos `--env-file`, Node da prioridad al último.
 - El usuario también edita datos: no «restaurar» lo que no cambié yo.
+- Celular (2026-11-28): medidas en rem o escala de Tailwind (no `[Npx]`, salvo líneas de 1–3 px); punto de corte `shell:`. Nada puede ensanchar la página (el celular la aleja entera): comprobar `scrollWidth === innerWidth` a 375 px; lo absoluto dentro de una tabla necesita `.tbl` (relativa).
 
 ## 7. Próximos pasos
 - El usuario crea su superusuario (Supabase › Add user + `pnpm db:supabase:admin`); luego probar ingreso, alta de usuarios y fotos en `web-supabase`.
-- Publicar (S7: hosting y dominio) y respaldos (S8); después, trabajadores, usuarios y responsables reales.
-- Commit cuando el usuario lo pida (nada de la etapa D en adelante está en un commit).
+- Publicar (S7: hosting y dominio) y respaldos (S8); después, trabajadores, usuarios y responsables reales. Commit solo cuando el usuario lo pida.
 - Después: adaptador de IA cuando haya clave; «operación mínima» (crear actividades y controles previos).

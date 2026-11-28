@@ -63,7 +63,7 @@ export function QuotesCards({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-x-[18px] min-[1151px]:grid-cols-2">
+    <div className="grid grid-cols-1 gap-x-4.5 min-[71.9375rem]:grid-cols-2">
       <Card title="Solicitudes de cotización">
         <RowList
           rows={requests.map((request) => {
@@ -158,7 +158,7 @@ export function QuotesCards({
               </tfoot>
             </table>
           </div>
-          <p className="border-t border-line px-4 py-2.5 text-[11.5px] text-mut">En verde, el valor más bajo de cada ítem.</p>
+          <p className="border-t border-line px-4 py-2.5 text-[0.71875rem] text-mut">En verde, el valor más bajo de cada ítem.</p>
         </Card>
       ))}
     </div>

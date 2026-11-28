@@ -47,7 +47,7 @@ export function useInlineSave<Field extends string>() {
 export function InlineError({ message }: { message: string | undefined }) {
   if (!message) return null;
   return (
-    <p role="alert" className="mt-1 max-w-[220px] text-[11px] leading-snug whitespace-normal text-ba">
+    <p role="alert" className="mt-1 max-w-55 text-[0.6875rem] leading-snug whitespace-normal text-ba">
       {message}
     </p>
   );
@@ -59,7 +59,7 @@ export function withCurrent(options: Option[], currentId: string | null, current
   return [{ id: currentId, name: `${currentName ?? 'Registro'} (${suffix})` }, ...options];
 }
 
-export const SELECT_CLASS = 'field min-w-[150px] !py-[5px] disabled:opacity-60';
+export const SELECT_CLASS = 'field min-w-37.5 !py-1.25 disabled:opacity-60';
 
 /** Responsable de un ítem: lista de trabajadores activos; se guarda al elegir. */
 export function ResponsibleSelect({
@@ -191,7 +191,7 @@ export function PlanCells({
             <input
               // La clave reinicia el campo cuando llega un costo distinto o se rechaza lo escrito.
               key={`${savedCost}:${rejections}`}
-              className="field w-[104px] !py-[5px] text-right tabular-nums disabled:opacity-60"
+              className="field w-26 !py-1.25 text-right tabular-nums disabled:opacity-60"
               aria-label={`Costo asignado del ítem ${itemLabel}`}
               inputMode="decimal"
               autoComplete="off"
@@ -223,7 +223,7 @@ export function PlanCells({
       <td>
         {canContract ? (
           <select
-            className={`${SELECT_CLASS} !min-w-[112px]`}
+            className={`${SELECT_CLASS} !min-w-28`}
             aria-label={`Contrato del ítem ${itemLabel}`}
             value={shown('contractStatus', contractStatus ?? '')}
             disabled={pending}
@@ -315,7 +315,7 @@ export function ActivityCells({
       <td>
         {canEdit ? (
           <select
-            className={`${SELECT_CLASS} !min-w-[124px]`}
+            className={`${SELECT_CLASS} !min-w-31`}
             aria-label={`Estado de la actividad ${name}`}
             value={shown('status', status ?? '')}
             disabled={pending}
@@ -406,7 +406,7 @@ export function MountSelect({
       value={status}
       options={MOUNT_OPTIONS}
       permission="mount.update"
-      className="!min-w-[124px]"
+      className="!min-w-31"
       onSave={(value) => updateMountStatus({ itemId, version: version === null ? '' : String(version), value })}
     />
   );
@@ -442,7 +442,7 @@ export function OperationalSelect({
       value={status}
       options={OPERATIONAL_OPTIONS}
       permission="mount.update"
-      className={`!min-w-[118px] ${status === 'ready' ? '!border-ok !text-ok' : status === 'in_progress' ? '!border-bl !text-bl' : ''}`}
+      className={`!min-w-29.5 ${status === 'ready' ? '!border-ok !text-ok' : status === 'in_progress' ? '!border-bl !text-bl' : ''}`}
       onSave={(value) => updateOperationalStatus({ itemId, version: version === null ? '' : String(version), value })}
     />
   );
@@ -470,7 +470,7 @@ export function CheckResultSelect({
       value={result}
       options={CHECK_OPTIONS}
       permission="checks.update"
-      className="!min-w-[116px]"
+      className="!min-w-29"
       onSave={(value) => updateCheckResult({ id, version: String(version), value })}
     />
   );

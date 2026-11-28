@@ -71,7 +71,7 @@ export default async function ProveedoresPage() {
                     <td>{supplier.active ? <Pill tone="ok">Activo</Pill> : <Pill>Inactivo</Pill>}</td>
                     <td>
                       {canWrite ? (
-                        <div className="flex justify-end gap-[7px]">
+                        <div className="flex justify-end gap-1.75">
                           <Link href={`/administracion/proveedores/${supplier.id}/editar`} className="btn">
                             Editar
                           </Link>

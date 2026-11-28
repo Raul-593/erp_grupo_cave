@@ -75,7 +75,7 @@ export default async function ProyectosPage() {
                     <td className="num">{formatAmount(project.contractAmount, project.currency)}</td>
                     <td className="num">{project.documentCount}</td>
                     <td>
-                      <div className="flex justify-end gap-[7px]">
+                      <div className="flex justify-end gap-1.75">
                         <form action={selectProject}>
                           <input type="hidden" name="projectId" value={project.id} />
                           <input type="hidden" name="next" value="requerimiento" />

@@ -45,7 +45,7 @@ export function SupplierForm({ initial }: { initial?: Record<string, string> }) 
       <Field name="notes" label="Notas" errors={errors} className="md:col-span-2">
         <textarea {...fieldProps('notes', values, errors)} rows={3} maxLength={2000} />
       </Field>
-      <label className="flex items-center gap-2 text-[12.5px] md:col-span-2">
+      <label className="flex items-center gap-2 text-[0.78125rem] md:col-span-2">
         <input type="checkbox" name="active" defaultChecked={values['active'] === 'on' || values['active'] === 'true'} />
         Activo (aparece en la lista de proveedores de Planificación)
       </label>

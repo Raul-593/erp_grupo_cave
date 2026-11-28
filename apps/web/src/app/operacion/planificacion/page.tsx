@@ -155,8 +155,8 @@ function Schedule({
   return (
     <Card title={`Cronograma · ${formatDateRange(range.start, range.end)}`}>
       <div className="overflow-x-auto p-4">
-        <div className="min-w-[560px]">
-          <div className="relative mb-1.5 ml-[214px] h-[13px] text-[9px] font-semibold tracking-[0.08em] text-mut2 uppercase" aria-hidden>
+        <div className="min-w-140">
+          <div className="relative mb-1.5 ml-53.5 h-3.25 text-[0.5625rem] font-semibold tracking-[0.08em] text-mut2 uppercase" aria-hidden>
             {ganttTicks(range).map((tick) => (
               <span key={tick.date} className="absolute top-0" style={{ left: `${tick.left}%` }}>
                 {formatDayMonth(tick.date)}
@@ -172,12 +172,12 @@ function Schedule({
               const status = activity.status ? ACTIVITY_STATUS[activity.status][0] : 'sin estado';
               return (
                 <li key={activity.id} className="flex items-center gap-3.5 py-1.5">
-                  <div className="w-[200px] flex-none overflow-hidden text-[12.5px] text-ellipsis whitespace-nowrap">
+                  <div className="w-50 flex-none overflow-hidden text-[0.78125rem] text-ellipsis whitespace-nowrap">
                     {activity.name}
-                    <small className="block text-[11px] text-mut2">{detail || '—'}</small>
+                    <small className="block text-[0.6875rem] text-mut2">{detail || '—'}</small>
                   </div>
                   <div
-                    className="relative h-[18px] flex-1 rounded bg-bg"
+                    className="relative h-4.5 flex-1 rounded bg-bg"
                     role="img"
                     aria-label={`${activity.name}: ${formatDateRange(activity.startDate, activity.endDate)}, ${
                       activity.isMilestone ? 'hito' : status
@@ -186,12 +186,12 @@ function Schedule({
                   >
                     {activity.isMilestone ? (
                       <i
-                        className="absolute top-1 block size-2.5 rotate-45 rounded-[2px] bg-vi"
-                        style={{ left: `calc(${bar.left + bar.width / 2}% - 5px)` }}
+                        className="absolute top-1 block size-2.5 rotate-45 rounded-[0.125rem] bg-vi"
+                        style={{ left: `calc(${bar.left + bar.width / 2}% - 0.3125rem)` }}
                       />
                     ) : (
                       <i
-                        className={`absolute top-1 block h-2.5 rounded-[5px] ${BAR_TONES[activity.status ?? 'not_started']}`}
+                        className={`absolute top-1 block h-2.5 rounded-[0.3125rem] ${BAR_TONES[activity.status ?? 'not_started']}`}
                         style={{ left: `${bar.left}%`, width: `${bar.width}%` }}
                       />
                     )}
@@ -200,12 +200,12 @@ function Schedule({
               );
             })}
           </ul>
-          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-mut">
+          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem] text-mut">
             <Legend className="bg-bl" label="En curso" />
             <Legend className="bg-ba" label="Atrasada" />
             <Legend className="bg-ok" label="Terminada" />
             <Legend className="bg-line2" label="Por iniciar o sin estado" />
-            <Legend className="rotate-45 !rounded-[2px] bg-vi" label="Hito" square />
+            <Legend className="rotate-45 !rounded-[0.125rem] bg-vi" label="Hito" square />
           </p>
         </div>
       </div>
@@ -216,7 +216,7 @@ function Schedule({
 function Legend({ className, label, square = false }: { className: string; label: string; square?: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <i className={`block h-2 rounded-[4px] ${square ? 'w-2' : 'w-4'} ${className}`} aria-hidden />
+      <i className={`block h-2 rounded-[0.25rem] ${square ? 'w-2' : 'w-4'} ${className}`} aria-hidden />
       {label}
     </span>
   );

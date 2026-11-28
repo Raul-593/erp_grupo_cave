@@ -24,17 +24,17 @@ export interface Kpi {
 export function Kpis({ items }: { items: Kpi[] }) {
   return (
     <dl
-      className={`mb-[18px] grid grid-cols-1 gap-[18px] min-[520px]:grid-cols-2 ${
-        items.length === 5 ? 'min-[1151px]:grid-cols-5' : 'min-[1151px]:grid-cols-4'
+      className={`mb-4.5 grid grid-cols-1 gap-4.5 min-[32.5rem]:grid-cols-2 ${
+        items.length === 5 ? 'min-[71.9375rem]:grid-cols-5' : 'min-[71.9375rem]:grid-cols-4'
       }`}
     >
       {items.map((item) => (
         <div key={item.label} className="rounded-lg border border-line bg-card px-4 py-3.5">
-          <dt className="text-[9px] font-semibold tracking-[0.1em] text-mut2 uppercase">{item.label}</dt>
-          <dd className={`mt-[7px] text-[22px] font-semibold tracking-[-0.01em] tabular-nums ${TEXT_TONES[item.tone ?? 'neutral']}`}>
+          <dt className="text-[0.5625rem] font-semibold tracking-[0.1em] text-mut2 uppercase">{item.label}</dt>
+          <dd className={`mt-1.75 text-[1.375rem] font-semibold tracking-[-0.01em] tabular-nums ${TEXT_TONES[item.tone ?? 'neutral']}`}>
             {item.value}
           </dd>
-          {item.hint ? <dd className="mt-[3px] text-[11.5px] text-mut">{item.hint}</dd> : null}
+          {item.hint ? <dd className="mt-0.75 text-[0.71875rem] text-mut">{item.hint}</dd> : null}
         </div>
       ))}
     </dl>
@@ -44,7 +44,7 @@ export function Kpis({ items }: { items: Kpi[] }) {
 /** Aviso visible mientras la matriz del proyecto sea la de demostración (AGENTS.md §2). */
 export function DemoBanner({ source }: { source: string }) {
   return (
-    <div role="note" className="mb-[18px] rounded-md bg-wab px-[13px] py-[11px] text-xs leading-[1.6] text-ink2">
+    <div role="note" className="mb-4.5 rounded-md bg-wab px-3.25 py-2.75 text-xs leading-[1.6] text-ink2">
       <b className="font-semibold text-wa">Datos de demostración.</b> Lo que ves aquí son los datos ilustrativos del prototipo ({source}
       ), no los de un TDR real ni una referencia de precios. Los indicadores se calculan de las filas guardadas.
     </div>
@@ -54,7 +54,7 @@ export function DemoBanner({ source }: { source: string }) {
 /** Aviso para el empleado de campo: la pantalla muestra solo sus ítems. */
 export function ScopeBanner({ count }: { count: number }) {
   return (
-    <div role="note" className="mb-[18px] rounded-md bg-bl2 px-[13px] py-[11px] text-xs leading-[1.6] text-ink2">
+    <div role="note" className="mb-4.5 rounded-md bg-bl2 px-3.25 py-2.75 text-xs leading-[1.6] text-ink2">
       <b className="font-semibold text-bl">Tus ítems.</b> Ves solo {count === 1 ? 'el ítem' : `los ${count} ítems`} de este proyecto donde
       eres responsable, y sus indicadores.
     </div>
@@ -131,7 +131,7 @@ export function ViewChips({
             key={value}
             href={`${basePath}?vista=${value}${eventId ? `&evento=${eventId}` : ''}`}
             aria-current={active ? 'page' : undefined}
-            className={`rounded-[5px] border px-[11px] py-[5px] text-[10.5px] font-semibold tracking-[0.05em] uppercase ${
+            className={`rounded-[0.3125rem] border px-2.75 py-1.25 text-[0.65625rem] font-semibold tracking-[0.05em] uppercase ${
               active ? 'border-transparent bg-bl2 text-bl' : 'border-line text-mut hover:text-ink'
             }`}
           >
@@ -163,12 +163,12 @@ export function ProductCell({ producto, secondary }: { producto: string; seconda
 export function StepDots({ done, total, label }: { done: number; total: number; label: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="inline-flex items-center gap-[3px]" aria-hidden>
+      <span className="inline-flex items-center gap-0.75" aria-hidden>
         {Array.from({ length: total }, (_, index) => (
-          <i key={index} className={`block size-[5px] rounded-full ${index < done ? 'bg-bl' : 'bg-line2'}`} />
+          <i key={index} className={`block size-1.25 rounded-full ${index < done ? 'bg-bl' : 'bg-line2'}`} />
         ))}
       </span>
-      <span className="text-[11.5px] text-ink2">{label}</span>
+      <span className="text-[0.71875rem] text-ink2">{label}</span>
       <span className="sr-only">
         (paso {done} de {total})
       </span>
@@ -181,10 +181,10 @@ export function RowList({ rows }: { rows: { key: string; title: ReactNode; detai
   return (
     <ul>
       {rows.map((row) => (
-        <li key={row.key} className="flex items-center gap-3 border-b border-line px-4 py-[11px] last:border-b-0">
+        <li key={row.key} className="flex items-center gap-3 border-b border-line px-4 py-2.75 last:border-b-0">
           <div className="min-w-0 flex-1">
             <b className="font-semibold">{row.title}</b>
-            {row.detail ? <small className="mt-0.5 block text-[11.5px] text-mut2">{row.detail}</small> : null}
+            {row.detail ? <small className="mt-0.5 block text-[0.71875rem] text-mut2">{row.detail}</small> : null}
           </div>
           {row.right}
         </li>

@@ -66,7 +66,7 @@ export default async function TrabajadoresPage() {
                     <td>{worker.active ? <Pill tone="ok">Activo</Pill> : <Pill>Inactivo</Pill>}</td>
                     <td>
                       {canWrite ? (
-                        <div className="flex justify-end gap-[7px]">
+                        <div className="flex justify-end gap-1.75">
                           <Link href={`/administracion/trabajadores/${worker.id}/editar`} className="btn">
                             Editar
                           </Link>

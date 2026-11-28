@@ -62,9 +62,9 @@ export function BulkAssign({
 
   return (
     <div className="border-b border-line bg-bg px-4 py-3">
-      <p className="text-[9px] font-semibold tracking-[0.1em] text-mut2 uppercase">Responsable en bloque · {eventName}</p>
+      <p className="text-[0.5625rem] font-semibold tracking-[0.1em] text-mut2 uppercase">Responsable en bloque · {eventName}</p>
       <div className="mt-2 flex flex-wrap items-end gap-2.5">
-        <div className="min-w-[190px]">
+        <div className="min-w-47.5">
           <label className="label" htmlFor="bloque-trabajador">
             Trabajador
           </label>
@@ -77,7 +77,7 @@ export function BulkAssign({
             ))}
           </select>
         </div>
-        <div className="min-w-[220px] max-w-[340px] flex-1">
+        <div className="min-w-55 max-w-85 flex-1">
           <label className="label" htmlFor="bloque-producto">
             Ítems
           </label>

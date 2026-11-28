@@ -76,10 +76,17 @@
   --color-bab: var(--bab);
   --color-vi: var(--vi);
   --color-vib: var(--vib);
+  /* Desde este ancho (881 px con la letra por omisión) la barra lateral queda fija. */
+  --breakpoint-shell: 55.0625rem;
   --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 @layer base {
+  html {
+    /* El celular no agranda el texto por su cuenta al girar la pantalla. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   html,
   body {
     min-height: 100%;
@@ -88,7 +95,7 @@
     background: var(--bg);
     color: var(--ink);
     font-family: var(--font-sans);
-    font-size: 13.5px;
+    font-size: 0.84375rem;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     font-feature-settings: 'tnum', 'cv05';
@@ -115,10 +122,10 @@
   .btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 7px 12px;
-    border-radius: 6px;
-    font-size: 10.5px;
+    gap: 0.375rem;
+    padding: 0.4375rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.65625rem;
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -151,8 +158,8 @@
   .card {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    margin-bottom: 18px;
+    border-radius: 0.5rem;
+    margin-bottom: 1.125rem;
   }
 
   .field {
@@ -160,9 +167,9 @@
     background: var(--card);
     color: var(--ink);
     border: 1px solid var(--line2);
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 12.5px;
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.78125rem;
     outline: none;
   }
   .field:focus {
@@ -174,33 +181,36 @@
   }
   .label {
     display: block;
-    font-size: 8.5px;
+    font-size: 0.53125rem;
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--mut2);
-    margin-bottom: 5px;
+    margin-bottom: 0.3125rem;
   }
 
   .tbl {
+    /* Lo que va en posición absoluta dentro de la tabla (textos solo para lector de pantalla)
+       queda dentro de su contenedor con desplazamiento y no ensancha la página. */
+    position: relative;
     width: 100%;
     border-collapse: collapse;
-    font-size: 12.5px;
+    font-size: 0.78125rem;
   }
   .tbl th {
     text-align: left;
-    font-size: 9px;
+    font-size: 0.5625rem;
     font-weight: 600;
     letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--mut);
     background: var(--bg);
-    padding: 9px 12px;
+    padding: 0.5625rem 0.75rem;
     white-space: nowrap;
     border-bottom: 1px solid var(--line);
   }
   .tbl td {
-    padding: 10px 12px;
+    padding: 0.625rem 0.75rem;
     border-bottom: 1px solid var(--line);
     vertical-align: middle;
   }
@@ -218,7 +228,14 @@
   .tbl td small {
     display: block;
     color: var(--mut2);
-    font-size: 11px;
+    font-size: 0.6875rem;
     margin-top: 2px;
+  }
+}
+
+/* Celular: con letra menor de 16 px, iOS acerca la página al tocar un campo. */
+@media (width < 55.0625rem) {
+  .field {
+    font-size: 1rem;
   }
 }

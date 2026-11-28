@@ -36,7 +36,7 @@ function AmountField({
       <input
         // La clave reinicia el campo cuando llega un valor distinto o se rechaza lo escrito.
         key={`${saved}:${resetKey}`}
-        className="field w-[96px] !py-[5px] text-right tabular-nums disabled:opacity-60"
+        className="field w-24 !py-1.25 text-right tabular-nums disabled:opacity-60"
         aria-label={label}
         inputMode="decimal"
         autoComplete="off"
@@ -130,7 +130,7 @@ export function OrderCells({
     <>
       <td>
         <select
-          className={`${SELECT_CLASS} !min-w-[112px]`}
+          className={`${SELECT_CLASS} !min-w-28`}
           aria-label={`Orden del ítem ${itemLabel}`}
           value={shown('orderId', orderId ?? '')}
           disabled={pending}
@@ -204,7 +204,7 @@ export function NewOrderForm({ projectId }: { projectId: string }) {
   return (
     <form action={action} className="flex flex-wrap items-center gap-2.5 border-t border-line bg-bg px-4 py-2.5" noValidate>
       <input type="hidden" name="projectId" value={projectId} />
-      <label htmlFor="nueva-orden" className="text-[9px] font-semibold tracking-[0.1em] text-mut2 uppercase">
+      <label htmlFor="nueva-orden" className="text-[0.5625rem] font-semibold tracking-[0.1em] text-mut2 uppercase">
         Nueva orden
       </label>
       <input
@@ -213,7 +213,7 @@ export function NewOrderForm({ projectId }: { projectId: string }) {
         // Tras crearla, el campo vuelve vacío; con error conserva lo escrito.
         key={state.status === 'ok' ? state.message : 'codigo'}
         defaultValue={state.status === 'error' ? (state.values?.['code'] ?? '') : ''}
-        className="field !w-[150px] !py-[5px]"
+        className="field !w-37.5 !py-1.25"
         placeholder="Código, p. ej. OC-019"
         maxLength={40}
         autoComplete="off"

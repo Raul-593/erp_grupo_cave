@@ -16,7 +16,7 @@ export function UserActiveButton({ id, version, active, name }: { id: string; ve
         {active ? 'Desactivar' : 'Activar'}
       </button>
       {state.status === 'error' ? (
-        <p role="alert" className="max-w-[240px] text-right text-[11px] text-ba">
+        <p role="alert" className="max-w-60 text-right text-[0.6875rem] text-ba">
           {state.message}
         </p>
       ) : null}

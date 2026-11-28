@@ -164,7 +164,7 @@ export default async function AbastecimientoPage({ searchParams }: { searchParam
         </div>
         {canWrite ? <NewOrderForm projectId={project.id} /> : null}
         {emptyOrders.length > 0 ? (
-          <p className="border-t border-line px-4 py-2.5 text-[11.5px] text-mut">
+          <p className="border-t border-line px-4 py-2.5 text-[0.71875rem] text-mut">
             {emptyOrders.length === 1 ? 'Orden sin ítems todavía: ' : 'Órdenes sin ítems todavía: '}
             <b className="font-semibold text-ink2">{emptyOrders.join(', ')}</b>
           </p>
@@ -237,7 +237,7 @@ export default async function AbastecimientoPage({ searchParams }: { searchParam
                       </td>
                       <td>
                         {canWrite ? (
-                          <div className="flex flex-wrap justify-end gap-[7px]">
+                          <div className="flex flex-wrap justify-end gap-1.75">
                             <Link href={`/operacion/abastecimiento/pagos/${payment.id}/editar`} className="btn">
                               Editar
                             </Link>

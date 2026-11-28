@@ -272,10 +272,10 @@ export default async function RequerimientoPage({ searchParams }: { searchParams
               {documents.map((document) => {
                 const status = document.latestExtractionStatus ? EXTRACTION_STATUS[document.latestExtractionStatus] : null;
                 return (
-                  <li key={document.id} className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-[11px] last:border-b-0">
+                  <li key={document.id} className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-2.75 last:border-b-0">
                     <div className="min-w-0 flex-1">
                       <b className="font-semibold break-all">{document.originalFilename}</b>
-                      <small className="mt-0.5 block text-[11.5px] text-mut2">
+                      <small className="mt-0.5 block text-[0.71875rem] text-mut2">
                         {formatBytes(document.sizeBytes)}
                         {document.pageCount ? ` · ${document.pageCount} págs.` : ''} · cargado el {formatDateTime(document.uploadedAt)}
                       </small>
@@ -294,7 +294,7 @@ export default async function RequerimientoPage({ searchParams }: { searchParams
           ) : null}
           {extraction && extraction.provider !== MANUAL_PROVIDER && extraction.provider !== EXCEL_PROVIDER ? <ExtractionPanel extraction={extraction} output={proposal} /> : null}
           {!canManageTdr ? null : !ai.ready ? (
-            <div className="border-t border-line px-4 py-3 text-[12px] text-ink2">
+            <div className="border-t border-line px-4 py-3 text-[0.75rem] text-ink2">
               <p className="font-semibold text-wa">La IA todavía no está configurada; «Procesar TDR con IA» está deshabilitado.</p>
               <ul className="mt-1 list-disc pl-5 text-mut">
                 {ai.problems.map((problem) => (
@@ -303,7 +303,7 @@ export default async function RequerimientoPage({ searchParams }: { searchParams
               </ul>
             </div>
           ) : (
-            <p className="border-t border-line px-4 py-2.5 text-[11.5px] text-mut">
+            <p className="border-t border-line px-4 py-2.5 text-[0.71875rem] text-mut">
               IA configurada: {ai.providerLabel} · {ai.model}
             </p>
           )}
@@ -313,7 +313,7 @@ export default async function RequerimientoPage({ searchParams }: { searchParams
               <ProjectValueForm projectId={project.id} version={project.version} initial={projectValueToForm(project)} />
             </div>
           ) : null}
-          {!canManageTdr && documents.length === 0 ? <p className="px-4 py-3 text-[12px] text-mut">Sin documentos cargados.</p> : null}
+          {!canManageTdr && documents.length === 0 ? <p className="px-4 py-3 text-[0.75rem] text-mut">Sin documentos cargados.</p> : null}
         </Card>
       ) : null}
 
@@ -394,7 +394,7 @@ export default async function RequerimientoPage({ searchParams }: { searchParams
               showBalance={can(user.role, 'procurement.read')}
               canUpload={can(user.role, 'evidence.upload')}
             />
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-bg px-4 py-2.5 text-[11.5px] text-mut">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-bg px-4 py-2.5 text-[0.71875rem] text-mut">
               <span>
                 {rows.length} ítems · {rubroCount} productos
                 {!confirmed.scoped ? ` · ${unassigned} sin responsable` : ''} ·{' '}
@@ -434,11 +434,11 @@ export default async function RequerimientoPage({ searchParams }: { searchParams
                           <small>{row.rubro}</small>
                         </td>
                         <td>{row.subproducto ?? '—'}</td>
-                        <td className="min-w-[220px] text-ink2">{row.descripcion || '—'}</td>
+                        <td className="min-w-55 text-ink2">{row.descripcion || '—'}</td>
                         <td className="num">{row.cant}</td>
                         <td>{row.unidad ?? '—'}</td>
                         <td className="num">{row.dias}</td>
-                        <td className="min-w-[200px] text-[11.5px] text-mut">{row.observacion ?? '—'}</td>
+                        <td className="min-w-50 text-[0.71875rem] text-mut">{row.observacion ?? '—'}</td>
                         <td className="whitespace-nowrap">
                           <ResponsibleSelect
                             itemId={row.key}
@@ -471,7 +471,7 @@ export default async function RequerimientoPage({ searchParams }: { searchParams
                 </tbody>
               </table>
             </div>
-            <div className="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-4 py-2.5 text-[11.5px] text-mut">
+            <div className="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-4 py-2.5 text-[0.71875rem] text-mut">
               <span>
                 {mode !== 'none' ? `${rows.length} ítems · ${rubroCount} rubros · ` : '0 ítems · 0 rubros'}
                 {mode !== 'none' && !confirmed?.scoped ? `${unassigned} sin responsable · ` : null}

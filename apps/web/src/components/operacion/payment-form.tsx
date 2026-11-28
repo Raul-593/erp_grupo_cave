@@ -164,7 +164,7 @@ export function PaymentForm({
       <fieldset className="min-w-0 md:col-span-2">
         <legend className="label">Reparto entre los ítems de la orden</legend>
         {lockedOrder ? (
-          <p role="alert" className="mb-2 rounded-md bg-wab px-[13px] py-[11px] text-xs leading-[1.6] text-ink2">
+          <p role="alert" className="mb-2 rounded-md bg-wab px-3.25 py-2.75 text-xs leading-[1.6] text-ink2">
             Este pago ya está repartido entre ítems de su orden actual. Para cambiarlo de orden, guárdalo primero sin reparto (en su orden
             actual, con los importes en blanco) y después elige la nueva orden.
           </p>
@@ -216,7 +216,7 @@ export function PaymentForm({
                             </span>
                             <input
                               name={name}
-                              className="field !w-[112px] !py-[5px] text-right tabular-nums"
+                              className="field !w-28 !py-1.25 text-right tabular-nums"
                               aria-label={`De este pago para el ítem ${line.code}`}
                               inputMode="decimal"
                               autoComplete="off"
@@ -228,11 +228,11 @@ export function PaymentForm({
                             />
                           </span>
                           {over ? (
-                            <p role="alert" className="mt-1 ml-auto max-w-[240px] text-[11px] leading-snug whitespace-normal text-ba">
+                            <p role="alert" className="mt-1 ml-auto max-w-60 text-[0.6875rem] leading-snug whitespace-normal text-ba">
                               Supera el saldo del ítem ({money(balance)}). Primero sube su costo en la orden.
                             </p>
                           ) : invalid ? (
-                            <p role="alert" className="mt-1 text-[11px] text-ba">
+                            <p role="alert" className="mt-1 text-[0.6875rem] text-ba">
                               Escribe un número, por ejemplo 8.400,50.
                             </p>
                           ) : (
@@ -262,7 +262,7 @@ export function PaymentForm({
               ) : (
                 <Pill tone="ok">Repartido por completo</Pill>
               )}
-              <span className="ml-auto flex flex-wrap gap-[7px]">
+              <span className="ml-auto flex flex-wrap gap-1.75">
                 <button type="button" className="btn" onClick={() => setManual(null)} disabled={manual === null}>
                   Proponer reparto
                 </button>
@@ -276,11 +276,11 @@ export function PaymentForm({
       </fieldset>
 
       {overBalance ? (
-        <div role="alert" className="rounded-md bg-bab px-[13px] py-[11px] text-xs leading-[1.6] text-ba md:col-span-2">
+        <div role="alert" className="rounded-md bg-bab px-3.25 py-2.75 text-xs leading-[1.6] text-ba md:col-span-2">
           <b className="font-semibold">No se puede pagar a un ítem más que su costo en la orden.</b> {RAISE_COST_FIRST}
         </div>
       ) : overPayment ? (
-        <div role="alert" className="rounded-md bg-bab px-[13px] py-[11px] text-xs leading-[1.6] text-ba md:col-span-2">
+        <div role="alert" className="rounded-md bg-bab px-3.25 py-2.75 text-xs leading-[1.6] text-ba md:col-span-2">
           El reparto entre los ítems suma más que el monto del pago. Baja algún importe o sube el monto.
         </div>
       ) : null}
@@ -294,7 +294,7 @@ export function PaymentForm({
         </Link>
         <FormMessage status={state.status} message={state.message} />
       </div>
-      <p className="text-[11.5px] text-mut md:col-span-2">
+      <p className="text-[0.71875rem] text-mut md:col-span-2">
         Lo pagado de cada ítem es la suma de lo que le reparten los pagos; ya no se escribe a mano. El reparto se propone en el orden de la
         matriz hasta el saldo de cada ítem y puedes ajustarlo. Lo que no repartas queda «sin repartir» y se puede asignar después editando el
         pago.
