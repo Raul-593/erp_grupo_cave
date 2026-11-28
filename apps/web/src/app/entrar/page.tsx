@@ -17,8 +17,10 @@ export const metadata: Metadata = { title: 'Entrar' };
  * Ingreso. Con Supabase Auth (parte S): correo y contraseña. En desarrollo (decisión U-D1):
  * «Entrar como…» sin contraseña, solo en este computador y con la base local.
  */
-export default async function EntrarPage() {
+export default async function EntrarPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await connection();
+  // Tras cambiar la contraseña sin poder renovar la sesión (server/actions/session.ts).
+  const passwordChanged = (await searchParams)['contrasena'] === 'cambiada';
   let problem: string | null = null;
   let providerId: string | null = null;
   try {
@@ -46,6 +48,11 @@ export default async function EntrarPage() {
             <Link href={homePath(current.role)} className="text-bl hover:underline">
               Continuar
             </Link>
+          </p>
+        ) : null}
+        {passwordChanged && !current ? (
+          <p role="status" className="text-[12.5px] text-ok">
+            Tu contraseña se cambió. Entra con la contraseña nueva.
           </p>
         ) : null}
         <PasswordSignInForm />

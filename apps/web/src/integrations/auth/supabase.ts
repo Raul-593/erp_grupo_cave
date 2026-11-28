@@ -49,7 +49,7 @@ export function supabaseAuthAdmin(): SupabaseClient['auth']['admin'] {
 
 export const supabaseAuthProvider: AuthProvider & {
   signIn(email: string, password: string): Promise<{ ok: true; authSubject: string; mustChangePassword: boolean } | { ok: false }>;
-  changePassword(password: string): Promise<{ ok: true } | { ok: false; message: string }>;
+  changePassword(password: string): Promise<{ ok: true; sessionRenewed: boolean } | { ok: false; message: string }>;
 } = {
   id: 'supabase',
   async currentIdentity() {
@@ -74,7 +74,14 @@ export const supabaseAuthProvider: AuthProvider & {
   async changePassword(password) {
     const client = await supabaseSessionClient();
     const { error } = await client.auth.updateUser({ password, data: { [MUST_CHANGE_PASSWORD]: false } });
-    if (!error) return { ok: true };
+    if (!error) {
+      // El token de la cookie conserva los metadatos de cuando se emitió (must_change_password =
+      // true) y currentIdentity lo lee de ahí: sin renovarlo, la persona volvería a esta página.
+      // Renovar la sesión emite un token con los metadatos nuevos y lo guarda en las cookies.
+      const refreshed = await client.auth.refreshSession();
+      const renewed = !refreshed.error && refreshed.data.user?.user_metadata?.[MUST_CHANGE_PASSWORD] !== true;
+      return { ok: true, sessionRenewed: renewed };
+    }
     if (error.code === 'same_password') return { ok: false, message: 'La contraseña nueva debe ser distinta de la actual.' };
     if (error.code === 'weak_password') return { ok: false, message: 'La contraseña es demasiado débil. Usa una más larga o variada.' };
     return { ok: false, message: 'No se pudo cambiar la contraseña. Vuelve a entrar e inténtalo de nuevo.' };

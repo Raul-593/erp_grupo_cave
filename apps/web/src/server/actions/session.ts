@@ -90,7 +90,14 @@ export async function changeOwnPassword(_prev: { message: string } | null, formD
     const result = await supabaseAuthProvider.changePassword(password);
     if (!result.ok) return { message: result.message };
     await recordAudit(db(), { userId: session.user.id, action: 'session.change_password', entity: 'app_users', entityId: session.user.id });
-    target = homePath(session.user.role);
+    if (result.sessionRenewed) {
+      // Con el token renovado entra directo a su página de inicio.
+      target = homePath(session.user.role);
+    } else {
+      // La contraseña ya cambió, pero la sesión no se pudo renovar: que vuelva a entrar con la nueva.
+      await supabaseAuthProvider.signOut();
+      target = '/entrar?contrasena=cambiada';
+    }
   } catch (error) {
     if (error instanceof AuthConfigError) return { message: error.message };
     return { message: toUserMessage(error) };

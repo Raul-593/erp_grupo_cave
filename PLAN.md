@@ -7,7 +7,7 @@
 | Proyecto «Graduaciones UNEMI» con tres eventos | **Completado en local (2026-11-27)**; pendiente la revisión del usuario (decisiones G-1…G-8). Resultado abajo |
 | Adaptador de IA (etapa C, subfase 1.3) | **Pendiente:** falta que el usuario elija proveedor y tenga clave de API |
 | Etapa D (subfase 1.4): matriz editable y confirmación | **Completado (2026-11-27)**; pendiente la revisión del usuario. Resultado abajo; retirar tras la revisión |
-| Catálogos en Administración y alta automática de trabajador/proveedor (parte A) | **Completado en local (2026-11-28)**; `0013` aplicada en `erp` y `erp_test`, pendiente en Supabase (aprobación aparte). Resultado abajo |
+| Catálogos en Administración y alta automática de trabajador/proveedor (parte A) | **Completado en local (2026-11-28)**; probado por el usuario; `0013` aplicada en `erp`, `erp_test` y Supabase (2026-11-28). Resultado abajo |
 | Subida a Supabase y uso desde celulares (parte S) | **En progreso.** Aprobado el 2026-11-27 con las recomendaciones S-D1…S-D8 (sin cargar usuarios: los crea el usuario). Hechos S0–S6; faltan primer superusuario (usuario), publicación (S7) y respaldos (S8) |
 
 ### Camino a las primeras pruebas (orden acordado, 2026-11-27)
@@ -45,7 +45,7 @@ Las tareas completadas (usuarios y permisos, control de campo en Ejecución, rep
 3. Migración `0013_alta_trabajador_proveedor.sql`: función y trigger `BEFORE INSERT ON app_users` que, si falta el vínculo, inserta el trabajador o proveedor y completa `worker_id`/`supplier_id` (los CHECK existentes se evalúan después del trigger). Sin tablas nuevas (RLS sin cambios). Down: quita trigger y función.
 4. Formulario y acción de usuario: opción «Crear uno nuevo», el `audit_log` del alta registra el trabajador/proveedor creado.
 5. Pruebas: repositorio de usuarios (alta con y sin vínculo, por tipo), navegación por rol y cobertura de `authorize`. Typecheck, lint, test y build; verificación en `web-verificacion`.
-6. Aplicar `0013` en `erp` y `erp_test` (con respaldo previo de `erp`). **En Supabase solo con aprobación aparte.**
+6. Aplicar `0013` en `erp` y `erp_test` (con respaldo previo de `erp`) y, con aprobación del usuario del 2026-11-28, en Supabase (más `db:supabase:setup --grants`; comprobado como `erp_app` en una transacción revertida).
 
 ### Resultado
 
@@ -53,6 +53,12 @@ Las tareas completadas (usuarios y permisos, control de campo en Ejecución, rep
 - `0013_alta_trabajador_proveedor.sql`: trigger `app_users_create_link` (`BEFORE INSERT`). Respaldo previo: `dumps/erp_antes_0013_2026-11-28.dump`.
 - Formulario: «Crear un trabajador/proveedor nuevo con este nombre» por omisión en el alta; al editar, campo y proveedor siguen exigiendo vínculo. La auditoría `user.create` registra el vínculo creado (`linkCreated`).
 - Pruebas: `pnpm test` (116 + 160), typecheck, lint y build sin errores; verificado en `web-verificacion` (redirección, pestañas y opciones del formulario). El alta real desde la pantalla no se probó en `erp` para no dejar un usuario de prueba (no se borran); la base se probó en `erp_test`.
+
+### Corrección: entrar tras cambiar la contraseña temporal (pedido del usuario, 2026-11-28)
+
+- Causa: `changePassword` actualizaba `must_change_password` en Supabase, pero el token de la cookie conservaba el valor anterior; `requirePageUser` volvía a mandar a `/cuenta/contrasena`.
+- Arreglo: tras el cambio se renueva la sesión (`refreshSession`) y se entra a la página de inicio del rol. Si no se puede renovar, se cierra la sesión y `/entrar?contrasena=cambiada` pide entrar con la nueva.
+- Pruebas: test, typecheck, lint y build sin errores. **Sin prueba de punta a punta:** necesita un usuario de Supabase con contraseña temporal (lo prueba el usuario).
 
 ### Riesgos
 
